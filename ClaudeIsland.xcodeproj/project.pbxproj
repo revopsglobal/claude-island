@@ -10,18 +10,10 @@
 		FD0F42E72EE7ABA400980302 /* Mixpanel in Frameworks */ = {isa = PBXBuildFile; productRef = FD0F42E62EE7ABA400980302 /* Mixpanel */; };
 		FDA49F7D2EE11E3C00F9612E /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = FD33FD722EDF32D7002A6548 /* Markdown */; };
 		FDA49F7E2EE11E3C00F9612E /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = FDA49F7F2EE11E3C00F9612E /* Sparkle */; };
-		A265128D796B44D088249076 /* EmotionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8C7CF2D51824B0D9E1AD519 /* EmotionState.swift */; };
-		277FED023A4D40848764D0ED /* EmotionAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E811E7CC64C14F87B586D17A /* EmotionAnalyzer.swift */; };
-		B095078B68584AD589CEBD85 /* EmotionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5F1331C6D947049DC93D0A /* EmotionManager.swift */; };
-		F623C169EC0347B6BE511E4B /* CostTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 995C8F9A94A346E890D52D8B /* CostTracker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		FD33FD5D2EDF32D7002A6548 /* Claude Island.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Claude Island.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		F8C7CF2D51824B0D9E1AD519 /* EmotionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmotionState.swift; sourceTree = "<group>"; };
-		E811E7CC64C14F87B586D17A /* EmotionAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmotionAnalyzer.swift; sourceTree = "<group>"; };
-		AE5F1331C6D947049DC93D0A /* EmotionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmotionManager.swift; sourceTree = "<group>"; };
-		995C8F9A94A346E890D52D8B /* CostTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CostTracker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -73,23 +65,6 @@
 				FD33FD5D2EDF32D7002A6548 /* Claude Island.app */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		86F88E4B2D5C471C9AC9544B /* Emotion */ = {
-			isa = PBXGroup;
-			children = (
-				E811E7CC64C14F87B586D17A /* EmotionAnalyzer.swift */,
-				AE5F1331C6D947049DC93D0A /* EmotionManager.swift */,
-			);
-			path = Emotion;
-			sourceTree = "<group>";
-		};
-		3C28A3D5FF3F4AD09FB764EF /* Cost */ = {
-			isa = PBXGroup;
-			children = (
-				995C8F9A94A346E890D52D8B /* CostTracker.swift */,
-			);
-			path = Cost;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -174,10 +149,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A265128D796B44D088249076 /* EmotionState.swift in Sources */,
-				277FED023A4D40848764D0ED /* EmotionAnalyzer.swift in Sources */,
-				B095078B68584AD589CEBD85 /* EmotionManager.swift in Sources */,
-				F623C169EC0347B6BE511E4B /* CostTracker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
