@@ -26,8 +26,20 @@ struct NotchView: View {
     @State private var isVisible: Bool = false
     @State private var isHovering: Bool = false
     @State private var isBouncing: Bool = false
+    @State private var sessionCosts: [String: CostSummary] = [:]
+    @State private var totalCost: CostSummary = .zero
 
     @Namespace private var activityNamespace
+
+    /// Current emotion of the most active session (for the crab)
+    private var primaryEmotion: CrabEmotion {
+        // Use the first processing/approval session, or the first instance
+        let activeSession = sessionMonitor.instances.first(where: {
+            $0.phase == .processing || $0.phase.isWaitingForApproval
+        }) ?? sessionMonitor.instances.first
+        guard let session = activeSession else { return .neutral }
+        return EmotionManager.shared.emotion(for: session.sessionId)
+    }
 
     /// Whether any Claude session is currently processing or compacting
     private var isAnyProcessing: Bool {
@@ -249,7 +261,7 @@ struct NotchView: View {
             // Left side - crab + optional permission indicator (visible when processing, pending, or waiting for input)
             if showClosedActivity {
                 HStack(spacing: 4) {
-                    ClaudeCrabIcon(size: 14, animateLegs: isProcessing)
+                    ClaudeCrabIcon(size: 14, animateLegs: isProcessing, emotion: primaryEmotion)
                         .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: showClosedActivity)
 
                     // Permission indicator only (amber) - waiting for input shows checkmark on right
@@ -307,7 +319,7 @@ struct NotchView: View {
             // Show static crab only if not showing activity in headerRow
             // (headerRow handles crab + indicator when showClosedActivity is true)
             if !showClosedActivity {
-                ClaudeCrabIcon(size: 14)
+                ClaudeCrabIcon(size: 14, emotion: primaryEmotion)
                     .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: !showClosedActivity)
                     .padding(.leading, 8)
             }

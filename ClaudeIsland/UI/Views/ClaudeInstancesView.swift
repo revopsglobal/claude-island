@@ -129,6 +129,7 @@ struct InstanceRow: View {
     @State private var isHovered = false
     @State private var spinnerPhase = 0
     @State private var isYabaiAvailable = false
+    @State private var sessionCost: CostSummary = .zero
 
     private let claudeOrange = Color(red: 0.85, green: 0.47, blue: 0.34)
     private let spinnerSymbols = ["·", "✢", "✳", "∗", "✻", "✽"]
@@ -153,10 +154,18 @@ struct InstanceRow: View {
 
             // Text content
             VStack(alignment: .leading, spacing: 2) {
-                Text(session.displayTitle)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(session.displayTitle)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+
+                    if sessionCost.sessionCost > 0 {
+                        Text(sessionCost.formattedCost)
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.35))
+                    }
+                }
 
                 // Show tool call when waiting for approval, otherwise last activity
                 if isWaitingForApproval, let toolName = session.pendingToolName {
@@ -289,6 +298,23 @@ struct InstanceRow: View {
         .onHover { isHovered = $0 }
         .task {
             isYabaiAvailable = await WindowFinder.shared.isYabaiAvailable()
+            sessionCost = await CostTracker.shared.costForSession(session.sessionId)
+        }
+        .onChange(of: session.phase) { _, _ in
+            Task {
+                sessionCost = await CostTracker.shared.costForSession(session.sessionId)
+            }
+        }
+    }
+
+    /// Emotion-tinted color for the processing spinner
+    private var emotionTintedOrange: Color {
+        let emotion = EmotionManager.shared.emotion(for: session.sessionId)
+        switch emotion {
+        case .neutral: return claudeOrange
+        case .happy: return Color(red: 0.95, green: 0.55, blue: 0.25)
+        case .sad: return Color(red: 0.65, green: 0.45, blue: 0.50)
+        case .sob: return Color(red: 0.55, green: 0.40, blue: 0.50)
         }
     }
 
@@ -298,7 +324,7 @@ struct InstanceRow: View {
         case .processing, .compacting:
             Text(spinnerSymbols[spinnerPhase % spinnerSymbols.count])
                 .font(.system(size: 12, weight: .bold))
-                .foregroundColor(claudeOrange)
+                .foregroundColor(emotionTintedOrange)
                 .onReceive(spinnerTimer) { _ in
                     spinnerPhase = (spinnerPhase + 1) % spinnerSymbols.count
                 }

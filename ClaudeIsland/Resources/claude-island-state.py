@@ -99,6 +99,10 @@ def main():
     if event == "UserPromptSubmit":
         # User just sent a message - Claude is now processing
         state["status"] = "processing"
+        # Pass user prompt for emotion analysis
+        prompt = data.get("prompt", "")
+        if prompt:
+            state["message"] = prompt
 
     elif event == "PreToolUse":
         state["status"] = "running_tool"

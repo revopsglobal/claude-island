@@ -46,9 +46,27 @@ class ClaudeSessionMonitor: ObservableObject {
                     }
                 }
 
+                // Emotion analysis on user prompts
+                if event.event == "UserPromptSubmit", let prompt = event.message, !prompt.isEmpty {
+                    Task { @MainActor in
+                        EmotionManager.shared.analyzePrompt(prompt, sessionId: event.sessionId)
+                    }
+                }
+
+                // Cost tracking on file syncs
+                if event.shouldSyncFile {
+                    Task {
+                        await CostTracker.shared.updateCosts(sessionId: event.sessionId, cwd: event.cwd)
+                    }
+                }
+
                 if event.status == "ended" {
                     Task { @MainActor in
                         InterruptWatcherManager.shared.stopWatching(sessionId: event.sessionId)
+                        EmotionManager.shared.removeSession(event.sessionId)
+                    }
+                    Task {
+                        await CostTracker.shared.removeSession(event.sessionId)
                     }
                 }
 
