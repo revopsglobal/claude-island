@@ -770,13 +770,17 @@ struct TurtleSceneView: View {
                 }
             }
 
-            // Walking logic
+            // Walking logic -- only walks when Claude is processing
             guard !s.isSleeping else { return }
+            guard isProcessing else {
+                s.isWalking = false
+                return
+            }
             guard now > s.walkPauseUntil else { return }
 
+            s.isWalking = true
             if s.isWalking {
-                // Walk speed: slower when idle, faster when processing
-                let speed: CGFloat = isProcessing ? 0.0018 : 0.0008
+                let speed: CGFloat = 0.0015
                 s.walkX += s.walkDirection * speed
 
                 // Edge boundaries (where the visible areas are)
