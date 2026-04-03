@@ -984,7 +984,7 @@ struct TurtleSceneView: View {
                     s.walkDirection = dir
 
                     // Can still eat flower on the way to rest
-                    if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && abs(s.walkX - s.flowerX) < 0.02 {
+                    if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && abs(s.walkX - s.flowerX) < 0.03 {
                         eatFlower()
                     }
                     return
@@ -998,13 +998,14 @@ struct TurtleSceneView: View {
             guard now > s.walkPauseUntil else { return }
 
             s.isWalking = true
-            if s.isWalking {
-                let speed: CGFloat = 0.0015
-                s.walkX += s.walkDirection * speed
+            let baseSpeed: CGFloat = 0.0015
+            let speed: CGFloat = abs(s.walkX) < 0.15 ? baseSpeed * 3 : baseSpeed
+            s.walkX += s.walkDirection * speed
 
-                // Edge boundaries (where the visible areas are)
-                let leftEdge: CGFloat = -0.45
-                let rightEdge: CGFloat = 0.45
+            // Edge boundaries
+            let leftEdge: CGFloat = -0.45
+            let rightEdge: CGFloat = 0.45
+            if true {
 
                 // Hit an edge: pause, then turn around
                 if s.walkX >= rightEdge {
@@ -1032,13 +1033,7 @@ struct TurtleSceneView: View {
                     }
                 }
 
-                // When crossing through center (behind notch), speed up
-                let centerZone: CGFloat = 0.15
-                if abs(s.walkX) < centerZone {
-                    s.walkX += s.walkDirection * speed * 2  // 3x speed through center
-                }
-
-                // Check if turtle is near the flower (stop just before it)
+                // Check if turtle is near the flower
                 let eatGap: CGFloat = 0.04  // small gap so head reaches flower
                 if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && abs(s.walkX - s.flowerX) < eatGap {
                     eatFlower()
