@@ -234,6 +234,65 @@ struct ClaudeTurtleIcon: View {
     }
 }
 
+// MARK: - Turtle Scene State (persists across view recreation)
+
+@MainActor
+class TurtleSceneState: ObservableObject {
+    // Motion
+    @Published var bobPhase: Double = 0
+    @Published var swayAngle: Double = 0
+    @Published var trembleX: Double = 0
+
+    // Walking
+    @Published var walkX: CGFloat = -0.35
+    @Published var walkDirection: CGFloat = 1
+    @Published var isWalking: Bool = true
+    @Published var walkPauseUntil: Date = .distantPast
+    @Published var facingRight: Bool = true
+
+    // Flower
+    @Published var flowerX: CGFloat = 0.35
+    @Published var flowerVisible: Bool = false
+    @Published var flowerScale: CGFloat = 0
+    @Published var flowerEaten: Bool = false
+    @Published var petalCount: Int = 5
+    @Published var petalRegrowing: Bool = false
+    @Published var isEating: Bool = false
+    @Published var mouthOpen: Bool = false
+
+    // Nature
+    @Published var butterflies: [(x: CGFloat, y: CGFloat, phase: Double, speed: Double)] = []
+    @Published var hearts: [(x: CGFloat, y: CGFloat, opacity: Double, age: Double)] = []
+    @Published var raindrops: [(x: CGFloat, y: CGFloat)] = []
+    @Published var seasonalParticles: [(x: CGFloat, y: CGFloat, drift: CGFloat, speed: CGFloat)] = []
+    @Published var confetti: [(x: CGFloat, y: CGFloat, color: Int, speed: CGFloat)] = []
+    @Published var timePhase: Double = 0
+
+    // Creatures
+    @Published var birdX: CGFloat = -0.2
+    @Published var birdVisible: Bool = false
+    @Published var birdLanded: Bool = false
+    @Published var wormVisible: Bool = false
+    @Published var wormY: CGFloat = 0
+
+    // Interaction
+    @Published var spinAngle: Double = 0
+    @Published var promptCount: Int = 0
+    @Published var errorStreak: Int = 0
+    @Published var hiddenInShell: Bool = false
+
+    // Life
+    @Published var isBlinking: Bool = false
+    @Published var headExtension: CGFloat = 0
+    @Published var isSleeping: Bool = false
+    @Published var breathScale: CGFloat = 1.0
+    @Published var lastActivityTime: Date = Date()
+    @Published var tailWag: CGFloat = 0
+    @Published var lookingUp: Bool = false
+
+    static let shared = TurtleSceneState()
+}
+
 // MARK: - Turtle Scene (grass island with animated turtle)
 
 struct TurtleSceneView: View {
@@ -242,57 +301,7 @@ struct TurtleSceneView: View {
     let width: CGFloat
     let height: CGFloat
 
-    // Motion state
-    @State private var bobPhase: Double = 0
-    @State private var swayAngle: Double = 0
-    @State private var trembleX: Double = 0
-
-    // Walking state
-    @State private var walkX: CGFloat = -0.35       // normalized position (-0.5 to 0.5), start on left edge
-    @State private var walkDirection: CGFloat = 1    // 1 = right, -1 = left
-    @State private var isWalking: Bool = true
-    @State private var walkPauseUntil: Date = .distantPast
-    @State private var facingRight: Bool = true
-
-    // Flower state
-    @State private var flowerX: CGFloat = 0.35          // where the flower is (normalized)
-    @State private var flowerVisible: Bool = false
-    @State private var flowerScale: CGFloat = 0
-    @State private var flowerEaten: Bool = false
-    @State private var petalCount: Int = 5              // 5 petals, turtle eats them one by one
-    @State private var petalRegrowing: Bool = false
-    @State private var isEating: Bool = false
-    @State private var mouthOpen: Bool = false
-
-    // Nature state
-    @State private var butterflies: [(x: CGFloat, y: CGFloat, phase: Double, speed: Double)] = []
-    @State private var hearts: [(x: CGFloat, y: CGFloat, opacity: Double, age: Double)] = []
-    @State private var raindrops: [(x: CGFloat, y: CGFloat)] = []
-    @State private var seasonalParticles: [(x: CGFloat, y: CGFloat, drift: CGFloat, speed: CGFloat)] = []
-    @State private var confetti: [(x: CGFloat, y: CGFloat, color: Int, speed: CGFloat)] = []
-    @State private var timePhase: Double = 0
-
-    // Creature visitors
-    @State private var birdX: CGFloat = -0.2
-    @State private var birdVisible: Bool = false
-    @State private var birdLanded: Bool = false
-    @State private var wormVisible: Bool = false
-    @State private var wormY: CGFloat = 0       // 0 = hidden, negative = poking out
-
-    // Interaction
-    @State private var spinAngle: Double = 0
-    @State private var promptCount: Int = 0
-    @State private var errorStreak: Int = 0
-    @State private var hiddenInShell: Bool = false
-
-    // Life state
-    @State private var isBlinking: Bool = false
-    @State private var headExtension: CGFloat = 0
-    @State private var isSleeping: Bool = false
-    @State private var breathScale: CGFloat = 1.0
-    @State private var lastActivityTime: Date = Date()
-    @State private var tailWag: CGFloat = 0
-    @State private var lookingUp: Bool = false
+    @ObservedObject private var s = TurtleSceneState.shared
 
     // Timers
     private let motionTimer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
@@ -302,7 +311,7 @@ struct TurtleSceneView: View {
     private let sleepThreshold: TimeInterval = 180
 
     private var bobAmplitude: CGFloat {
-        if isSleeping { return 0.3 }
+        if s.isSleeping { return 0.3 }
         switch emotion {
         case .neutral: return 1.2
         case .happy: return 2.0
@@ -312,12 +321,12 @@ struct TurtleSceneView: View {
     }
 
     private var bobSpeed: Double {
-        if isSleeping { return 3.0 }
+        if s.isSleeping { return 3.0 }
         return isProcessing ? 0.6 : 1.5
     }
 
     private var swayDeg: Double {
-        if isSleeping { return 0.1 }
+        if s.isSleeping { return 0.1 }
         switch emotion {
         case .neutral: return 0.5
         case .happy: return 1.5
@@ -384,7 +393,7 @@ struct TurtleSceneView: View {
         // Jan 1 = top hat
         if month == 1 && day == 1 { return .tophat }
         // Confetti active = party hat
-        if !confetti.isEmpty { return .party }
+        if !s.confetti.isEmpty { return .party }
         return .none
     }
 
@@ -428,9 +437,9 @@ struct TurtleSceneView: View {
                 // Stars/fireflies at night
                 if isNighttime {
                     for i in 0 ..< 6 {
-                        let sx = CGFloat(i) * w / 6.0 + sin(timePhase * 0.5 + Double(i)) * 3
-                        let sy = CGFloat(3 + (i % 3) * 5) + sin(timePhase * 0.3 + Double(i) * 2) * 2
-                        let glow = 0.3 + sin(timePhase * 2 + Double(i) * 1.5) * 0.3
+                        let sx = CGFloat(i) * w / 6.0 + sin(s.timePhase * 0.5 + Double(i)) * 3
+                        let sy = CGFloat(3 + (i % 3) * 5) + sin(s.timePhase * 0.3 + Double(i) * 2) * 2
+                        let glow = 0.3 + sin(s.timePhase * 2 + Double(i) * 1.5) * 0.3
                         let star = Path { p in
                             p.addEllipse(in: CGRect(x: sx, y: sy, width: 2, height: 2))
                         }
@@ -440,7 +449,7 @@ struct TurtleSceneView: View {
 
                 // Raindrops (when sad/sob)
                 if emotion == .sad || emotion == .sob {
-                    for drop in raindrops {
+                    for drop in s.raindrops {
                         let raindrop = Path { p in
                             p.addRect(CGRect(x: drop.x, y: drop.y, width: 1, height: 3))
                         }
@@ -450,10 +459,10 @@ struct TurtleSceneView: View {
             }
 
             // Butterflies
-            ForEach(0 ..< butterflies.count, id: \.self) { i in
-                let b = butterflies[i]
+            ForEach(0 ..< s.butterflies.count, id: \.self) { i in
+                let b = s.butterflies[i]
                 Canvas { context, _ in
-                    let wingPhase = sin(timePhase * b.speed * 8)
+                    let wingPhase = sin(s.timePhase * b.speed * 8)
                     let wingW: CGFloat = 3 + CGFloat(wingPhase) * 1.5
                     // Left wing
                     let lw = Path { p in
@@ -486,8 +495,8 @@ struct TurtleSceneView: View {
             }
 
             // Hearts (when happy)
-            ForEach(0 ..< hearts.count, id: \.self) { i in
-                let h = hearts[i]
+            ForEach(0 ..< s.hearts.count, id: \.self) { i in
+                let h = s.hearts[i]
                 Text("\u{2665}")
                     .font(.system(size: 6))
                     .foregroundColor(Color.red.opacity(h.opacity))
@@ -499,8 +508,8 @@ struct TurtleSceneView: View {
             }
 
             // Seasonal particles (snow, cherry blossoms, leaves)
-            ForEach(0 ..< seasonalParticles.count, id: \.self) { i in
-                let p = seasonalParticles[i]
+            ForEach(0 ..< s.seasonalParticles.count, id: \.self) { i in
+                let p = s.seasonalParticles[i]
                 Canvas { context, _ in
                     switch currentSeason {
                     case .winter:
@@ -516,7 +525,7 @@ struct TurtleSceneView: View {
                         let leaf = Path { path in path.addEllipse(in: CGRect(x: -2, y: -1.5, width: 4, height: 3)) }
                         context.fill(leaf, with: .color(Color(red: 0.85, green: 0.5, blue: 0.15).opacity(0.7)))
                     case .summer:
-                        break  // no particles in summer (butterflies are enough)
+                        break  // no particles in summer (s.butterflies are enough)
                     }
                 }
                 .frame(width: 6, height: 6)
@@ -525,8 +534,8 @@ struct TurtleSceneView: View {
             }
 
             // Confetti (milestones)
-            ForEach(0 ..< confetti.count, id: \.self) { i in
-                let c = confetti[i]
+            ForEach(0 ..< s.confetti.count, id: \.self) { i in
+                let c = s.confetti[i]
                 let colors: [Color] = [.red, .yellow, .blue, .green, .orange, .purple]
                 Rectangle()
                     .fill(colors[c.color % colors.count])
@@ -536,7 +545,7 @@ struct TurtleSceneView: View {
             }
 
             // Bird visitor
-            if birdVisible {
+            if s.birdVisible {
                 Canvas { context, _ in
                     let birdColor = Color(red: 0.6, green: 0.35, blue: 0.2)
                     // Body
@@ -552,21 +561,21 @@ struct TurtleSceneView: View {
                     let eye = Path { p in p.addEllipse(in: CGRect(x: 4.5, y: -2, width: 1.5, height: 1.5)) }
                     context.fill(eye, with: .color(.black))
                     // Wing (if not landed, show flap)
-                    if !birdLanded {
+                    if !s.birdLanded {
                         let wing = Path { p in p.addEllipse(in: CGRect(x: -2, y: -5, width: 6, height: 4)) }
                         context.fill(wing, with: .color(birdColor.opacity(0.7)))
                     }
                 }
                 .frame(width: 16, height: 12)
                 .offset(
-                    x: birdX * width,
-                    y: birdLanded ? -(height * 0.3) : -(height * 0.6 + CGFloat(sin(timePhase * 3)) * 3)
+                    x: s.birdX * width,
+                    y: s.birdLanded ? -(height * 0.3) : -(height * 0.6 + CGFloat(sin(s.timePhase * 3)) * 3)
                 )
                 .allowsHitTesting(false)
             }
 
             // Worm poking out of dirt
-            if wormVisible {
+            if s.wormVisible {
                 Canvas { context, _ in
                     let wormColor = Color(red: 0.7, green: 0.45, blue: 0.35)
                     let body = Path { p in p.addRoundedRect(in: CGRect(x: -1.5, y: 0, width: 3, height: 8), cornerSize: CGSize(width: 1.5, height: 1.5)) }
@@ -575,12 +584,12 @@ struct TurtleSceneView: View {
                     context.fill(eye, with: .color(.black))
                 }
                 .frame(width: 6, height: 10)
-                .offset(x: CGFloat.random(in: -0.3 ... 0.3) * width, y: wormY)
+                .offset(x: CGFloat.random(in: -0.3 ... 0.3) * width, y: s.wormY)
                 .allowsHitTesting(false)
             }
 
             // Flower with individually visible petals
-            if flowerVisible {
+            if s.flowerVisible {
                 Canvas { context, canvasSize in
                     let s = min(height * 0.35, 14) / 14.0
                     let cx = canvasSize.width / 2
@@ -611,7 +620,7 @@ struct TurtleSceneView: View {
                     let petalH: CGFloat = 7 * s
 
                     for (i, angle) in petalAngles.enumerated() {
-                        guard i < petalCount else { continue }
+                        guard i < s.petalCount else { continue }
                         let rad = angle * .pi / 180
                         let px = cx + cos(rad) * petalRadius - petalW / 2
                         let py = cy - 1 * s + sin(rad) * petalRadius - petalH / 2
@@ -629,168 +638,168 @@ struct TurtleSceneView: View {
                     context.fill(center, with: .color(centerColor))
                 }
                 .frame(width: 24, height: 24)
-                .scaleEffect(flowerScale)
+                .scaleEffect(s.flowerScale)
                 .offset(
-                    x: flowerX * width,
+                    x: s.flowerX * width,
                     y: -(height * 0.15)
                 )
                 .transition(.scale.combined(with: .opacity))
-                .animation(.easeInOut(duration: 0.2), value: petalCount)
+                .animation(.easeInOut(duration: 0.2), value: s.petalCount)
             }
 
             // Turtle (walks across scene, flips direction)
             ClaudeTurtleIcon(
                 size: min(height * 0.75, 28),
-                animateLegs: (isWalking && !isSleeping && !isEating) || (isProcessing && !isSleeping && !isEating),
+                animateLegs: (s.isWalking && !s.isSleeping && !s.isEating) || (isProcessing && !s.isSleeping && !s.isEating),
                 emotion: emotion,
-                isBlinking: isBlinking,
-                headExtension: headExtension,
-                isSleeping: isSleeping,
-                mouthOpen: mouthOpen,
-                lookingUp: lookingUp,
-                hiddenInShell: hiddenInShell,
+                s.isBlinking: s.isBlinking,
+                s.headExtension: s.headExtension,
+                s.isSleeping: s.isSleeping,
+                s.mouthOpen: s.mouthOpen,
+                s.lookingUp: s.lookingUp,
+                s.hiddenInShell: s.hiddenInShell,
                 hatType: currentHat,
                 shellProgress: 0
             )
             .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
-            .scaleEffect(x: facingRight ? breathScale : -breathScale, y: breathScale, anchor: .bottom)
+            .scaleEffect(x: s.facingRight ? s.breathScale : -s.breathScale, y: s.breathScale, anchor: .bottom)
             .offset(
-                x: walkX * width + (emotion == .sob ? CGFloat(trembleX) : 0) + tailWag,
-                y: -(height * 0.25) + CGFloat(sin(bobPhase) * Double(bobAmplitude))
+                x: s.walkX * width + (emotion == .sob ? CGFloat(s.trembleX) : 0) + s.tailWag,
+                y: -(height * 0.25) + CGFloat(sin(s.bobPhase) * Double(bobAmplitude))
             )
-            .rotationEffect(.degrees(swayAngle * swayDeg + spinAngle), anchor: .bottom)
+            .rotationEffect(.degrees(s.swayAngle * swayDeg + s.spinAngle), anchor: .bottom)
             .onTapGesture {
                 // Click turtle → spin!
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.4)) {
-                    spinAngle += 360
+                    s.spinAngle += 360
                 }
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(600))
-                    withAnimation(.easeOut(duration: 0.2)) { spinAngle = 0 }
+                    withAnimation(.easeOut(duration: 0.2)) { s.spinAngle = 0 }
                 }
             }
         }
         .frame(width: width, height: height)
         .onReceive(motionTimer) { now in
             // Core motion
-            bobPhase += (2.0 * .pi) / (bobSpeed * 30.0)
-            swayAngle = sin(bobPhase * 0.7)
-            trembleX = emotion == .sob ? Double.random(in: -1.0 ... 1.0) : 0
+            s.bobPhase += (2.0 * .pi) / (bobSpeed * 30.0)
+            s.swayAngle = sin(s.bobPhase * 0.7)
+            s.trembleX = emotion == .sob ? Double.random(in: -1.0 ... 1.0) : 0
 
             // Breathing: subtle shell pulse
-            let breathCycle = sin(bobPhase * 0.4) * 0.015
-            breathScale = 1.0 + CGFloat(breathCycle)
+            let breathCycle = sin(s.bobPhase * 0.4) * 0.015
+            s.breathScale = 1.0 + CGFloat(breathCycle)
 
             // Nature animation clock
-            timePhase += 1.0 / 30.0
+            s.timePhase += 1.0 / 30.0
 
             // Butterfly movement (gentle drift)
-            for i in 0 ..< butterflies.count {
-                butterflies[i].x += CGFloat(sin(timePhase * butterflies[i].speed + butterflies[i].phase)) * 0.002
-                butterflies[i].y += CGFloat(cos(timePhase * butterflies[i].speed * 0.7 + butterflies[i].phase)) * 0.003
+            for i in 0 ..< s.butterflies.count {
+                s.butterflies[i].x += CGFloat(sin(s.timePhase * s.butterflies[i].speed + s.butterflies[i].phase)) * 0.002
+                s.butterflies[i].y += CGFloat(cos(s.timePhase * s.butterflies[i].speed * 0.7 + s.butterflies[i].phase)) * 0.003
                 // Wrap around
-                if butterflies[i].x < -0.1 { butterflies[i].x = 1.1 }
-                if butterflies[i].x > 1.1 { butterflies[i].x = -0.1 }
-                if butterflies[i].y < 0.05 { butterflies[i].y = 0.4 }
-                if butterflies[i].y > 0.5 { butterflies[i].y = 0.05 }
+                if s.butterflies[i].x < -0.1 { s.butterflies[i].x = 1.1 }
+                if s.butterflies[i].x > 1.1 { s.butterflies[i].x = -0.1 }
+                if s.butterflies[i].y < 0.05 { s.butterflies[i].y = 0.4 }
+                if s.butterflies[i].y > 0.5 { s.butterflies[i].y = 0.05 }
             }
 
             // Heart particles (float up and fade)
-            for i in (0 ..< hearts.count).reversed() {
-                hearts[i].y -= 0.01
-                hearts[i].opacity -= 0.015
-                hearts[i].age += 1.0 / 30.0
-                if hearts[i].opacity <= 0 {
-                    hearts.remove(at: i)
+            for i in (0 ..< s.hearts.count).reversed() {
+                s.hearts[i].y -= 0.01
+                s.hearts[i].opacity -= 0.015
+                s.hearts[i].age += 1.0 / 30.0
+                if s.hearts[i].opacity <= 0 {
+                    s.hearts.remove(at: i)
                 }
             }
 
             // Raindrops (fall and respawn)
             if emotion == .sad || emotion == .sob {
-                for i in 0 ..< raindrops.count {
-                    raindrops[i].y += 2
-                    if raindrops[i].y > height {
-                        raindrops[i].y = 0
-                        raindrops[i].x = CGFloat.random(in: 0 ... max(width, 1))
+                for i in 0 ..< s.raindrops.count {
+                    s.raindrops[i].y += 2
+                    if s.raindrops[i].y > height {
+                        s.raindrops[i].y = 0
+                        s.raindrops[i].x = CGFloat.random(in: 0 ... max(width, 1))
                     }
                 }
             }
 
             // Seasonal particles (drift and fall)
-            for i in 0 ..< seasonalParticles.count {
-                seasonalParticles[i].y += seasonalParticles[i].speed
-                seasonalParticles[i].x += seasonalParticles[i].drift + CGFloat(sin(timePhase + Double(i))) * 0.3
-                if seasonalParticles[i].y > height {
-                    seasonalParticles[i].y = -5
-                    seasonalParticles[i].x = CGFloat.random(in: 0 ... max(width, 1))
+            for i in 0 ..< s.seasonalParticles.count {
+                s.seasonalParticles[i].y += s.seasonalParticles[i].speed
+                s.seasonalParticles[i].x += s.seasonalParticles[i].drift + CGFloat(sin(s.timePhase + Double(i))) * 0.3
+                if s.seasonalParticles[i].y > height {
+                    s.seasonalParticles[i].y = -5
+                    s.seasonalParticles[i].x = CGFloat.random(in: 0 ... max(width, 1))
                 }
             }
 
             // Confetti (fall and fade)
-            for i in (0 ..< confetti.count).reversed() {
-                confetti[i].y += confetti[i].speed
-                confetti[i].x += CGFloat(sin(timePhase * 3 + Double(i) * 2)) * 0.5
-                if confetti[i].y > height + 10 {
-                    confetti.remove(at: i)
+            for i in (0 ..< s.confetti.count).reversed() {
+                s.confetti[i].y += s.confetti[i].speed
+                s.confetti[i].x += CGFloat(sin(s.timePhase * 3 + Double(i) * 2)) * 0.5
+                if s.confetti[i].y > height + 10 {
+                    s.confetti.remove(at: i)
                 }
             }
 
             // Bird flight
-            if birdVisible && !birdLanded {
-                birdX += 0.002
-                if birdX > 0.5 {
+            if s.birdVisible && !s.birdLanded {
+                s.birdX += 0.002
+                if s.birdX > 0.5 {
                     // Land on grass
-                    birdLanded = true
+                    s.birdLanded = true
                 }
             }
 
             // Walking logic
-            guard !isSleeping else { return }
-            guard now > walkPauseUntil else { return }
+            guard !s.isSleeping else { return }
+            guard now > s.walkPauseUntil else { return }
 
-            if isWalking {
+            if s.isWalking {
                 // Walk speed: slower when idle, faster when processing
                 let speed: CGFloat = isProcessing ? 0.0018 : 0.0008
-                walkX += walkDirection * speed
+                s.walkX += s.walkDirection * speed
 
                 // Edge boundaries (where the visible areas are)
                 let leftEdge: CGFloat = -0.45
                 let rightEdge: CGFloat = 0.45
 
                 // Hit an edge: pause, then turn around
-                if walkX >= rightEdge {
-                    walkX = rightEdge
-                    isWalking = false
+                if s.walkX >= rightEdge {
+                    s.walkX = rightEdge
+                    s.isWalking = false
                     // Pause at edge 2-5 seconds (longer on edges = more visible time)
                     let pause = Double.random(in: 2.0 ... 5.0)
-                    walkPauseUntil = now.addingTimeInterval(pause)
+                    s.walkPauseUntil = now.addingTimeInterval(pause)
                     Task { @MainActor in
                         try? await Task.sleep(for: .seconds(pause))
-                        walkDirection = -1
-                        facingRight = false
-                        isWalking = true
+                        s.walkDirection = -1
+                        s.facingRight = false
+                        s.isWalking = true
                     }
-                } else if walkX <= leftEdge {
-                    walkX = leftEdge
-                    isWalking = false
+                } else if s.walkX <= leftEdge {
+                    s.walkX = leftEdge
+                    s.isWalking = false
                     let pause = Double.random(in: 2.0 ... 5.0)
-                    walkPauseUntil = now.addingTimeInterval(pause)
+                    s.walkPauseUntil = now.addingTimeInterval(pause)
                     Task { @MainActor in
                         try? await Task.sleep(for: .seconds(pause))
-                        walkDirection = 1
-                        facingRight = true
-                        isWalking = true
+                        s.walkDirection = 1
+                        s.facingRight = true
+                        s.isWalking = true
                     }
                 }
 
                 // When crossing through center (behind notch), speed up
                 let centerZone: CGFloat = 0.15
-                if abs(walkX) < centerZone {
-                    walkX += walkDirection * speed * 2  // 3x speed through center
+                if abs(s.walkX) < centerZone {
+                    s.walkX += s.walkDirection * speed * 2  // 3x speed through center
                 }
 
                 // Check if turtle reached the flower (only when walking toward it with full petals)
-                if flowerVisible && !flowerEaten && !petalRegrowing && petalCount >= 5 && abs(walkX - flowerX) < 0.06 {
+                if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount >= 5 && abs(s.walkX - s.flowerX) < 0.06 {
                     eatFlower()
                 }
             }
@@ -798,54 +807,54 @@ struct TurtleSceneView: View {
         .onReceive(lifeTimer) { now in
             // Track activity
             if isProcessing {
-                lastActivityTime = now
-                if isSleeping {
+                s.lastActivityTime = now
+                if s.isSleeping {
                     // Wake up
-                    withAnimation(.easeInOut(duration: 0.5)) { isSleeping = false }
+                    withAnimation(.easeInOut(duration: 0.5)) { s.isSleeping = false }
                 }
             }
 
             // Sleep check
-            if !isProcessing && now.timeIntervalSince(lastActivityTime) > sleepThreshold && !isSleeping {
-                withAnimation(.easeInOut(duration: 1.0)) { isSleeping = true }
+            if !isProcessing && now.timeIntervalSince(s.lastActivityTime) > sleepThreshold && !s.isSleeping {
+                withAnimation(.easeInOut(duration: 1.0)) { s.isSleeping = true }
             }
 
             // Blinking (every 3-6 seconds, 150ms blink)
-            if !isSleeping && !isBlinking && Int.random(in: 0 ..< 8) == 0 {
-                isBlinking = true
+            if !s.isSleeping && !s.isBlinking && Int.random(in: 0 ..< 8) == 0 {
+                s.isBlinking = true
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(150))
-                    isBlinking = false
+                    s.isBlinking = false
                 }
             }
 
             // Hearts when happy
-            if emotion == .happy && !isSleeping && Int.random(in: 0 ..< 4) == 0 {
-                hearts.append((
-                    x: CGFloat(walkX) + 0.5 + CGFloat.random(in: -0.02 ... 0.02),
+            if emotion == .happy && !s.isSleeping && Int.random(in: 0 ..< 4) == 0 {
+                s.hearts.append((
+                    x: CGFloat(s.walkX) + 0.5 + CGFloat.random(in: -0.02 ... 0.02),
                     y: 0.6,
                     opacity: 0.9,
                     age: 0
                 ))
-                // Cap at 5 hearts
-                if hearts.count > 5 { hearts.removeFirst() }
+                // Cap at 5 s.hearts
+                if s.hearts.count > 5 { s.hearts.removeFirst() }
             }
 
             // Rain management
-            if (emotion == .sad || emotion == .sob) && raindrops.count < 15 {
+            if (emotion == .sad || emotion == .sob) && s.raindrops.count < 15 {
                 for _ in 0 ..< 3 {
-                    raindrops.append((
+                    s.raindrops.append((
                         x: CGFloat.random(in: 0 ... max(width, 1)),
                         y: CGFloat.random(in: 0 ... max(height, 1))
                     ))
                 }
-            } else if emotion != .sad && emotion != .sob && !raindrops.isEmpty {
-                raindrops.removeAll()
+            } else if emotion != .sad && emotion != .sob && !s.raindrops.isEmpty {
+                s.raindrops.removeAll()
             }
 
             // Seasonal particle spawning
-            if currentSeason != .summer && seasonalParticles.count < 8 && Int.random(in: 0 ..< 6) == 0 {
-                seasonalParticles.append((
+            if currentSeason != .summer && s.seasonalParticles.count < 8 && Int.random(in: 0 ..< 6) == 0 {
+                s.seasonalParticles.append((
                     x: CGFloat.random(in: 0 ... max(width, 1)),
                     y: -5,
                     drift: CGFloat.random(in: -0.3 ... 0.3),
@@ -854,90 +863,90 @@ struct TurtleSceneView: View {
             }
 
             // Bird visitor (random, about every 2 minutes)
-            if !birdVisible && Int.random(in: 0 ..< 240) == 0 {
-                birdX = -0.5
-                birdVisible = true
-                birdLanded = false
+            if !s.birdVisible && Int.random(in: 0 ..< 240) == 0 {
+                s.birdX = -0.5
+                s.birdVisible = true
+                s.birdLanded = false
                 // Bird flies away after 10-15 seconds
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(Double.random(in: 10 ... 15)))
-                    birdVisible = false
-                    birdLanded = false
+                    s.birdVisible = false
+                    s.birdLanded = false
                 }
             }
 
             // Worm pokes out occasionally
-            if !wormVisible && Int.random(in: 0 ..< 120) == 0 {
-                wormVisible = true
-                wormY = 0
+            if !s.wormVisible && Int.random(in: 0 ..< 120) == 0 {
+                s.wormVisible = true
+                s.wormY = 0
                 Task { @MainActor in
                     // Poke up
                     for _ in 0 ..< 5 {
-                        withAnimation(.easeOut(duration: 0.2)) { wormY -= 2 }
+                        withAnimation(.easeOut(duration: 0.2)) { s.wormY -= 2 }
                         try? await Task.sleep(for: .milliseconds(200))
                     }
                     // Pause
                     try? await Task.sleep(for: .seconds(Double.random(in: 2 ... 4)))
                     // Retract
                     for _ in 0 ..< 5 {
-                        withAnimation(.easeIn(duration: 0.15)) { wormY += 2 }
+                        withAnimation(.easeIn(duration: 0.15)) { s.wormY += 2 }
                         try? await Task.sleep(for: .milliseconds(150))
                     }
-                    wormVisible = false
+                    s.wormVisible = false
                 }
             }
 
             // Error streak → hide in shell
-            if emotion == .sob && errorStreak >= 3 && !hiddenInShell {
-                withAnimation(.easeIn(duration: 0.3)) { hiddenInShell = true }
-                isWalking = false
+            if emotion == .sob && s.errorStreak >= 3 && !s.hiddenInShell {
+                withAnimation(.easeIn(duration: 0.3)) { s.hiddenInShell = true }
+                s.isWalking = false
             }
-            if emotion != .sob && hiddenInShell {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { hiddenInShell = false }
-                isWalking = true
-                errorStreak = 0
+            if emotion != .sob && s.hiddenInShell {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { s.hiddenInShell = false }
+                s.isWalking = true
+                s.errorStreak = 0
             }
 
             // Look up at user occasionally (breaks fourth wall)
-            if !isSleeping && !isEating && !lookingUp && Int.random(in: 0 ..< 40) == 0 {
-                lookingUp = true
+            if !s.isSleeping && !s.isEating && !s.lookingUp && Int.random(in: 0 ..< 40) == 0 {
+                s.lookingUp = true
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(Double.random(in: 1.0 ... 2.0)))
-                    lookingUp = false
+                    s.lookingUp = false
                 }
             }
 
             // Idle fidgets (random head movements and tail wags)
-            if !isProcessing && !isSleeping {
+            if !isProcessing && !s.isSleeping {
                 // Head peek (occasionally extend/retract)
                 if Int.random(in: 0 ..< 20) == 0 {
                     let target = CGFloat.random(in: -2 ... 3)
-                    withAnimation(.easeInOut(duration: 0.4)) { headExtension = target }
+                    withAnimation(.easeInOut(duration: 0.4)) { s.headExtension = target }
                     Task { @MainActor in
                         try? await Task.sleep(for: .milliseconds(800))
-                        withAnimation(.easeInOut(duration: 0.3)) { headExtension = 0 }
+                        withAnimation(.easeInOut(duration: 0.3)) { s.headExtension = 0 }
                     }
                 }
 
                 // Tail wag (small horizontal shift)
                 if Int.random(in: 0 ..< 25) == 0 {
-                    withAnimation(.easeInOut(duration: 0.15)) { tailWag = CGFloat.random(in: -0.5 ... 0.5) }
+                    withAnimation(.easeInOut(duration: 0.15)) { s.tailWag = CGFloat.random(in: -0.5 ... 0.5) }
                     Task { @MainActor in
                         try? await Task.sleep(for: .milliseconds(300))
-                        withAnimation(.easeInOut(duration: 0.15)) { tailWag = 0 }
+                        withAnimation(.easeInOut(duration: 0.15)) { s.tailWag = 0 }
                     }
                 }
             }
         }
         .onAppear {
             // Always have a flower on the scene
-            if !flowerVisible {
+            if !s.flowerVisible {
                 spawnFlower()
             }
-            // Spawn 2-3 butterflies
-            if butterflies.isEmpty {
+            // Spawn 2-3 s.butterflies
+            if s.butterflies.isEmpty {
                 for _ in 0 ..< Int.random(in: 2 ... 3) {
-                    butterflies.append((
+                    s.butterflies.append((
                         x: CGFloat.random(in: 0.1 ... 0.9),
                         y: CGFloat.random(in: 0.1 ... 0.4),
                         phase: Double.random(in: 0 ... .pi * 2),
@@ -948,26 +957,26 @@ struct TurtleSceneView: View {
         }
         .onChange(of: isProcessing) { wasProcessing, nowProcessing in
             // Wake up when processing starts
-            if nowProcessing && isSleeping {
+            if nowProcessing && s.isSleeping {
                 // First prompt after sleep = stretch wake-up
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { isSleeping = false }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { s.isSleeping = false }
                 // Yawn/stretch: head extends way out then back
                 Task { @MainActor in
-                    withAnimation(.easeOut(duration: 0.4)) { headExtension = 6 }
+                    withAnimation(.easeOut(duration: 0.4)) { s.headExtension = 6 }
                     try? await Task.sleep(for: .milliseconds(600))
-                    withAnimation(.easeInOut(duration: 0.3)) { headExtension = 0 }
+                    withAnimation(.easeInOut(duration: 0.3)) { s.headExtension = 0 }
                 }
             }
-            lastActivityTime = Date()
+            s.lastActivityTime = Date()
 
             if nowProcessing {
-                promptCount += 1
-                errorStreak = 0
+                s.promptCount += 1
+                s.errorStreak = 0
 
                 // Confetti at milestones (every 50 prompts)
-                if promptCount % 50 == 0 {
+                if s.promptCount % 50 == 0 {
                     for _ in 0 ..< 20 {
-                        confetti.append((
+                        s.confetti.append((
                             x: CGFloat.random(in: 0 ... max(width, 1)),
                             y: -CGFloat.random(in: 0 ... 10),
                             color: Int.random(in: 0 ..< 6),
@@ -978,34 +987,34 @@ struct TurtleSceneView: View {
             }
 
             // Spawn a new flower if there isn't one
-            if nowProcessing && !flowerVisible {
+            if nowProcessing && !s.flowerVisible {
                 spawnFlower()
             }
         }
         .onChange(of: emotion) { oldEmotion, newEmotion in
             // Track error streaks
             if newEmotion == .sad || newEmotion == .sob {
-                errorStreak += 1
+                s.errorStreak += 1
             } else if newEmotion == .happy || newEmotion == .neutral {
-                errorStreak = 0
+                s.errorStreak = 0
             }
 
             // Happy bounce reaction
             if newEmotion == .happy {
                 withAnimation(.spring(response: 0.2, dampingFraction: 0.4)) {
-                    headExtension = 4
+                    s.headExtension = 4
                 }
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(400))
-                    withAnimation(.easeInOut(duration: 0.3)) { headExtension = 0 }
+                    withAnimation(.easeInOut(duration: 0.3)) { s.headExtension = 0 }
                 }
             }
             // Sad: retract head
             if newEmotion == .sad || newEmotion == .sob {
-                withAnimation(.easeInOut(duration: 0.5)) { headExtension = -3 }
+                withAnimation(.easeInOut(duration: 0.5)) { s.headExtension = -3 }
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(1200))
-                    withAnimation(.easeInOut(duration: 0.4)) { headExtension = 0 }
+                    withAnimation(.easeInOut(duration: 0.4)) { s.headExtension = 0 }
                 }
             }
         }
@@ -1016,69 +1025,69 @@ struct TurtleSceneView: View {
     private func spawnFlower() {
         // Place flower on a visible edge (randomly left or right)
         let side: CGFloat = Bool.random() ? -1 : 1
-        flowerX = side * CGFloat.random(in: 0.38 ... 0.44)
-        flowerEaten = false
-        petalCount = 5
-        petalRegrowing = false
-        flowerVisible = true
-        flowerScale = 0
+        s.flowerX = side * CGFloat.random(in: 0.38 ... 0.44)
+        s.flowerEaten = false
+        s.petalCount = 5
+        s.petalRegrowing = false
+        s.flowerVisible = true
+        s.flowerScale = 0
 
         // Grow animation
         withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-            flowerScale = 1.0
+            s.flowerScale = 1.0
         }
         // Don't redirect turtle -- let him walk naturally and eat when he passes by
     }
 
     private func eatFlower() {
-        guard !flowerEaten else { return }
-        flowerEaten = true
-        isEating = true
-        isWalking = false  // Stop walking to eat
+        guard !s.flowerEaten else { return }
+        s.flowerEaten = true
+        s.isEating = true
+        s.isWalking = false  // Stop walking to eat
 
         // Eat petals one by one with mouth chomping
         Task { @MainActor in
-            for petal in stride(from: petalCount, to: 0, by: -1) {
+            for petal in stride(from: s.petalCount, to: 0, by: -1) {
                 // Open mouth + head forward
-                mouthOpen = true
+                s.mouthOpen = true
                 withAnimation(.spring(response: 0.1, dampingFraction: 0.5)) {
-                    headExtension = 3
+                    s.headExtension = 3
                 }
                 try? await Task.sleep(for: .milliseconds(250))
 
                 // Close mouth (chomp!) + remove a petal
-                mouthOpen = false
+                s.mouthOpen = false
                 withAnimation(.easeOut(duration: 0.15)) {
-                    petalCount = petal - 1
+                    s.petalCount = petal - 1
                 }
                 withAnimation(.easeOut(duration: 0.1)) {
-                    headExtension = 1
+                    s.headExtension = 1
                 }
                 try? await Task.sleep(for: .milliseconds(200))
 
                 // Open mouth again for next bite
                 if petal - 1 > 0 {
-                    mouthOpen = true
+                    s.mouthOpen = true
                     try? await Task.sleep(for: .milliseconds(150))
-                    mouthOpen = false
+                    s.mouthOpen = false
                     try? await Task.sleep(for: .milliseconds(100))
                 }
             }
 
             // Done eating
-            mouthOpen = false
-            withAnimation(.easeOut(duration: 0.2)) { headExtension = 0 }
-            isEating = false
+            s.mouthOpen = false
+            withAnimation(.easeOut(duration: 0.2)) { s.headExtension = 0 }
+            s.isEating = false
 
             // All petals eaten, turtle walks away
-            petalRegrowing = true
+            s.petalRegrowing = true
             startPetalRegrowth()
 
             // Walk away from flower
-            let awayDirection: CGFloat = walkX > 0 ? -1 : 1
-            walkDirection = awayDirection
-            facingRight = walkDirection > 0
-            isWalking = true
+            let awayDirection: CGFloat = s.walkX > 0 ? -1 : 1
+            s.walkDirection = awayDirection
+            s.facingRight = s.walkDirection > 0
+            s.isWalking = true
         }
     }
 
@@ -1089,16 +1098,16 @@ struct TurtleSceneView: View {
 
             // Regrow petals one by one
             for p in 1 ... 5 {
-                guard flowerVisible && petalRegrowing else { return }
+                guard s.flowerVisible && s.petalRegrowing else { return }
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    petalCount = p
+                    s.petalCount = p
                 }
                 try? await Task.sleep(for: .milliseconds(600))
             }
 
             // Flower is fully regrown, turtle can come eat it again
-            petalRegrowing = false
-            flowerEaten = false
+            s.petalRegrowing = false
+            s.flowerEaten = false
             // Don't redirect turtle -- he'll eat it next time he walks past
         }
     }
