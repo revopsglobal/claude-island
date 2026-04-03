@@ -14,24 +14,31 @@ struct ClaudeTurtleIcon: View {
     let size: CGFloat
     var animateLegs: Bool = false
     var emotion: CrabEmotion = .neutral
+    var isBlinking: Bool = false
+    var headExtension: CGFloat = 0  // 0 = normal, negative = retracted, positive = extended
+    var isSleeping: Bool = false
 
     @State private var legPhase: Int = 0
 
     private let legTimer = Timer.publish(every: 0.18, on: .main, in: .common).autoconnect()
 
-    init(size: CGFloat = 16, animateLegs: Bool = false, emotion: CrabEmotion = .neutral) {
+    init(size: CGFloat = 16, animateLegs: Bool = false, emotion: CrabEmotion = .neutral,
+         isBlinking: Bool = false, headExtension: CGFloat = 0, isSleeping: Bool = false) {
         self.size = size
         self.animateLegs = animateLegs
         self.emotion = emotion
+        self.isBlinking = isBlinking
+        self.headExtension = headExtension
+        self.isSleeping = isSleeping
     }
 
-    /// Emotion-based shell color
+    // Emotion-based shell color
     private var shellColor: Color {
         switch emotion {
-        case .neutral: return Color(red: 0.35, green: 0.60, blue: 0.35)  // forest green
-        case .happy: return Color(red: 0.40, green: 0.70, blue: 0.30)    // bright green
-        case .sad: return Color(red: 0.35, green: 0.45, blue: 0.40)      // muted teal
-        case .sob: return Color(red: 0.30, green: 0.38, blue: 0.38)      // grey-green
+        case .neutral: return Color(red: 0.35, green: 0.60, blue: 0.35)
+        case .happy: return Color(red: 0.40, green: 0.70, blue: 0.30)
+        case .sad: return Color(red: 0.35, green: 0.45, blue: 0.40)
+        case .sob: return Color(red: 0.30, green: 0.38, blue: 0.38)
         }
     }
 
@@ -55,20 +62,21 @@ struct ClaudeTurtleIcon: View {
 
     var body: some View {
         Canvas { context, canvasSize in
-            let s = size / 48.0  // design grid is 48 units
+            let s = size / 48.0
             let xOff = (canvasSize.width - 56 * s) / 2
+            let headX = headExtension
 
             func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, color: Color) {
                 let r = CGRect(x: (x + xOff / s) * s, y: y * s, width: w * s, height: h * s)
                 context.fill(Path(r), with: .color(color))
             }
 
-            // -- LEGS (4 stubby legs) --
+            // -- LEGS --
             let legOffsets: [[CGFloat]] = [
-                [2, -2, 2, -2],   // phase 0
-                [0, 0, 0, 0],     // phase 1
-                [-2, 2, -2, 2],   // phase 2
-                [0, 0, 0, 0],     // phase 3
+                [2, -2, 2, -2],
+                [0, 0, 0, 0],
+                [-2, 2, -2, 2],
+                [0, 0, 0, 0],
             ]
             let currentLeg = animateLegs ? legOffsets[legPhase % 4] : [CGFloat](repeating: 0, count: 4)
             let legPositions: [(CGFloat, CGFloat)] = [(8, 36), (18, 36), (32, 36), (42, 36)]
@@ -77,22 +85,19 @@ struct ClaudeTurtleIcon: View {
                 rect(pos.0, pos.1, 6, h, color: skinColor)
             }
 
-            // -- BODY (under shell) --
+            // -- BODY --
             rect(6, 28, 44, 10, color: skinColor)
 
-            // -- SHELL (dome shape) --
-            // Shell base
+            // -- SHELL --
             rect(8, 8, 40, 22, color: shellColor)
-            // Shell top curve
             rect(12, 4, 32, 6, color: shellColor)
-            // Shell details (hexagonal pattern hints)
             rect(14, 10, 10, 8, color: shellDetailColor)
             rect(26, 10, 10, 8, color: shellDetailColor)
             rect(20, 20, 10, 8, color: shellDetailColor)
             rect(34, 20, 8, 6, color: shellDetailColor)
 
-            // -- HEAD --
-            rect(46, 20, 10, 12, color: skinColor)
+            // -- HEAD (with extension) --
+            rect(46 + headX, 20, 10, 12, color: skinColor)
 
             // -- TAIL --
             rect(0, 30, 8, 4, color: skinColor)
@@ -100,25 +105,50 @@ struct ClaudeTurtleIcon: View {
 
             // -- EYES --
             let eyeColor: Color = .black
-            switch emotion {
-            case .neutral:
-                rect(50, 22, 3, 3, color: eyeColor)  // simple dot
-            case .happy:
-                rect(50, 24, 3, 2, color: eyeColor)  // squinted
-            case .sad:
-                rect(50, 23, 3, 4, color: eyeColor)  // droopy
-            case .sob:
-                rect(49, 21, 4, 5, color: eyeColor)  // wide open
+            if isSleeping {
+                // Sleeping: closed eyes (horizontal lines)
+                rect(50 + headX, 24, 4, 1.5, color: eyeColor)
+            } else if isBlinking {
+                // Blink: thin horizontal line
+                rect(50 + headX, 24, 3, 1, color: eyeColor)
+            } else {
+                switch emotion {
+                case .neutral:
+                    rect(50 + headX, 22, 3, 3, color: eyeColor)
+                case .happy:
+                    rect(50 + headX, 24, 3, 2, color: eyeColor)
+                case .sad:
+                    rect(50 + headX, 23, 3, 4, color: eyeColor)
+                case .sob:
+                    rect(49 + headX, 21, 4, 5, color: eyeColor)
+                }
             }
 
             // -- MOUTH --
-            switch emotion {
-            case .happy:
-                rect(51, 28, 4, 2, color: eyeColor)  // smile
-            case .sad, .sob:
-                rect(51, 30, 4, 2, color: eyeColor)  // frown
-            default:
-                break
+            if isSleeping {
+                // Sleeping: tiny "z" hint (no mouth)
+            } else {
+                switch emotion {
+                case .happy:
+                    rect(51 + headX, 28, 4, 2, color: eyeColor)
+                case .sad, .sob:
+                    rect(51 + headX, 30, 4, 2, color: eyeColor)
+                default:
+                    break
+                }
+            }
+
+            // -- SLEEP Zs (when sleeping) --
+            if isSleeping {
+                let zColor = Color.white.opacity(0.5)
+                // Small z
+                rect(54 + headX, 14, 4, 1, color: zColor)
+                rect(55 + headX, 15, 2, 1, color: zColor)
+                rect(54 + headX, 16, 4, 1, color: zColor)
+                // Bigger Z
+                rect(58 + headX, 8, 5, 1.5, color: zColor)
+                rect(60 + headX, 9.5, 3, 1.5, color: zColor)
+                rect(58 + headX, 11, 5, 1.5, color: zColor)
             }
         }
         .frame(width: size * (56.0 / 48.0), height: size)
@@ -139,13 +169,28 @@ struct TurtleSceneView: View {
     let width: CGFloat
     let height: CGFloat
 
+    // Motion state
     @State private var bobPhase: Double = 0
     @State private var swayAngle: Double = 0
     @State private var trembleX: Double = 0
 
+    // Life state
+    @State private var isBlinking: Bool = false
+    @State private var headExtension: CGFloat = 0
+    @State private var isSleeping: Bool = false
+    @State private var breathScale: CGFloat = 1.0
+    @State private var lastActivityTime: Date = Date()
+    @State private var tailWag: CGFloat = 0
+
+    // Timers
     private let motionTimer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
+    private let lifeTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+
+    // Sleep after 3 minutes of idle
+    private let sleepThreshold: TimeInterval = 180
 
     private var bobAmplitude: CGFloat {
+        if isSleeping { return 0.3 }
         switch emotion {
         case .neutral: return 1.2
         case .happy: return 2.0
@@ -155,10 +200,12 @@ struct TurtleSceneView: View {
     }
 
     private var bobSpeed: Double {
-        isProcessing ? 0.6 : 1.5
+        if isSleeping { return 3.0 }
+        return isProcessing ? 0.6 : 1.5
     }
 
     private var swayDeg: Double {
+        if isSleeping { return 0.1 }
         switch emotion {
         case .neutral: return 0.5
         case .happy: return 1.5
@@ -181,13 +228,13 @@ struct TurtleSceneView: View {
                 let h = canvasSize.height
                 let grassTop = h * 0.55
 
-                // Dirt/ground layer
+                // Dirt layer
                 let dirt = Path { p in
                     p.addRect(CGRect(x: 0, y: grassTop + 4, width: w, height: h - grassTop - 4))
                 }
                 context.fill(dirt, with: .color(dirtColor))
 
-                // Grass surface (slightly wavy)
+                // Grass surface
                 let grass = Path { p in
                     p.move(to: CGPoint(x: 0, y: grassTop + 4))
                     for x in stride(from: 0, through: w, by: 2) {
@@ -200,7 +247,7 @@ struct TurtleSceneView: View {
                 }
                 context.fill(grass, with: .color(grassDark))
 
-                // Grass highlights (pixel tufts)
+                // Grass tufts
                 for i in stride(from: CGFloat(3), to: w, by: 8) {
                     let tuftY = grassTop + sin(i * 0.15) * 2 - 3
                     let tuft = Path { p in
@@ -211,19 +258,105 @@ struct TurtleSceneView: View {
                 }
             }
 
-            // Turtle (centered, animated)
-            ClaudeTurtleIcon(size: min(height * 0.55, 22), animateLegs: isProcessing, emotion: emotion)
-                .offset(
-                    x: emotion == .sob ? CGFloat(trembleX * 1.0) : 0,
-                    y: -(height * 0.35) + CGFloat(sin(bobPhase) * Double(bobAmplitude))
-                )
-                .rotationEffect(.degrees(swayAngle * swayDeg), anchor: .bottom)
+            // Turtle
+            ClaudeTurtleIcon(
+                size: min(height * 0.55, 22),
+                animateLegs: isProcessing && !isSleeping,
+                emotion: emotion,
+                isBlinking: isBlinking,
+                headExtension: headExtension,
+                isSleeping: isSleeping
+            )
+            .scaleEffect(breathScale, anchor: .bottom)
+            .offset(
+                x: (emotion == .sob ? CGFloat(trembleX) : 0) + tailWag,
+                y: -(height * 0.35) + CGFloat(sin(bobPhase) * Double(bobAmplitude))
+            )
+            .rotationEffect(.degrees(swayAngle * swayDeg), anchor: .bottom)
         }
         .frame(width: width, height: height)
         .onReceive(motionTimer) { _ in
+            // Core motion
             bobPhase += (2.0 * .pi) / (bobSpeed * 30.0)
             swayAngle = sin(bobPhase * 0.7)
             trembleX = emotion == .sob ? Double.random(in: -1.0 ... 1.0) : 0
+
+            // Breathing: subtle shell pulse
+            let breathCycle = sin(bobPhase * 0.4) * 0.015
+            breathScale = 1.0 + CGFloat(breathCycle)
+        }
+        .onReceive(lifeTimer) { now in
+            // Track activity
+            if isProcessing {
+                lastActivityTime = now
+                if isSleeping {
+                    // Wake up
+                    withAnimation(.easeInOut(duration: 0.5)) { isSleeping = false }
+                }
+            }
+
+            // Sleep check
+            if !isProcessing && now.timeIntervalSince(lastActivityTime) > sleepThreshold && !isSleeping {
+                withAnimation(.easeInOut(duration: 1.0)) { isSleeping = true }
+            }
+
+            // Blinking (every 3-6 seconds, 150ms blink)
+            if !isSleeping && !isBlinking && Int.random(in: 0 ..< 8) == 0 {
+                isBlinking = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(150))
+                    isBlinking = false
+                }
+            }
+
+            // Idle fidgets (random head movements and tail wags)
+            if !isProcessing && !isSleeping {
+                // Head peek (occasionally extend/retract)
+                if Int.random(in: 0 ..< 20) == 0 {
+                    let target = CGFloat.random(in: -2 ... 3)
+                    withAnimation(.easeInOut(duration: 0.4)) { headExtension = target }
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(800))
+                        withAnimation(.easeInOut(duration: 0.3)) { headExtension = 0 }
+                    }
+                }
+
+                // Tail wag (small horizontal shift)
+                if Int.random(in: 0 ..< 25) == 0 {
+                    withAnimation(.easeInOut(duration: 0.15)) { tailWag = CGFloat.random(in: -0.5 ... 0.5) }
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(300))
+                        withAnimation(.easeInOut(duration: 0.15)) { tailWag = 0 }
+                    }
+                }
+            }
+        }
+        .onChange(of: isProcessing) { wasProcessing, nowProcessing in
+            // Wake up when processing starts
+            if nowProcessing && isSleeping {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { isSleeping = false }
+            }
+            lastActivityTime = Date()
+        }
+        .onChange(of: emotion) { _, newEmotion in
+            // Happy bounce reaction
+            if newEmotion == .happy {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.4)) {
+                    headExtension = 4
+                }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(400))
+                    withAnimation(.easeInOut(duration: 0.3)) { headExtension = 0 }
+                }
+            }
+            // Sad: retract head
+            if newEmotion == .sad || newEmotion == .sob {
+                withAnimation(.easeInOut(duration: 0.5)) { headExtension = -3 }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(1200))
+                    withAnimation(.easeInOut(duration: 0.4)) { headExtension = 0 }
+                }
+            }
         }
     }
 }
