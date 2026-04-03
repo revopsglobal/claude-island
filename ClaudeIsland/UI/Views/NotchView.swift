@@ -76,7 +76,7 @@ struct NotchView: View {
     /// Extra width for expanding activities (like Dynamic Island)
     /// Symmetric expansion on both sides for the turtle's grass island
     private var expansionWidth: CGFloat {
-        let perSide: CGFloat = 50  // 50px expansion on each side of notch
+        let perSide: CGFloat = 65  // 65px expansion on each side of notch
 
         if activityCoordinator.expandingActivity.show {
             switch activityCoordinator.expandingActivity.type {
