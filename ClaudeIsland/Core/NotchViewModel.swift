@@ -161,14 +161,22 @@ class NotchViewModel: ObservableObject {
         hoverTimer?.cancel()
         hoverTimer = nil
 
-        // Start hover timer to auto-expand after 1 second
         if isHovering && (status == .closed || status == .popping) {
+            // Start hover timer to auto-expand after 1 second
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self = self, self.isHovering else { return }
                 self.notchOpen(reason: .hover)
             }
             hoverTimer = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+        } else if !isHovering && status == .opened && openReason == .hover && !isInChatMode {
+            // Auto-close after 2 seconds when cursor leaves (only for hover-opened, not click/notification)
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self = self, !self.isHovering, self.status == .opened, self.openReason == .hover else { return }
+                self.notchClose()
+            }
+            hoverTimer = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: workItem)
         }
     }
 

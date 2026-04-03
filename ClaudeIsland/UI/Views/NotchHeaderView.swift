@@ -32,31 +32,31 @@ struct ClaudeTurtleIcon: View {
         self.isSleeping = isSleeping
     }
 
-    // Emotion-based shell color
+    // Emotion-based shell color (bright enough to pop against dark grass)
     private var shellColor: Color {
         switch emotion {
-        case .neutral: return Color(red: 0.35, green: 0.60, blue: 0.35)
-        case .happy: return Color(red: 0.40, green: 0.70, blue: 0.30)
-        case .sad: return Color(red: 0.35, green: 0.45, blue: 0.40)
-        case .sob: return Color(red: 0.30, green: 0.38, blue: 0.38)
+        case .neutral: return Color(red: 0.45, green: 0.72, blue: 0.40)
+        case .happy: return Color(red: 0.50, green: 0.82, blue: 0.35)
+        case .sad: return Color(red: 0.40, green: 0.52, blue: 0.48)
+        case .sob: return Color(red: 0.35, green: 0.45, blue: 0.45)
         }
     }
 
     private var skinColor: Color {
         switch emotion {
-        case .neutral: return Color(red: 0.55, green: 0.75, blue: 0.40)
-        case .happy: return Color(red: 0.60, green: 0.82, blue: 0.38)
-        case .sad: return Color(red: 0.48, green: 0.58, blue: 0.45)
-        case .sob: return Color(red: 0.42, green: 0.50, blue: 0.42)
+        case .neutral: return Color(red: 0.65, green: 0.85, blue: 0.45)
+        case .happy: return Color(red: 0.72, green: 0.92, blue: 0.42)
+        case .sad: return Color(red: 0.55, green: 0.65, blue: 0.52)
+        case .sob: return Color(red: 0.48, green: 0.58, blue: 0.48)
         }
     }
 
     private var shellDetailColor: Color {
         switch emotion {
-        case .neutral: return Color(red: 0.28, green: 0.48, blue: 0.28)
-        case .happy: return Color(red: 0.32, green: 0.55, blue: 0.22)
-        case .sad: return Color(red: 0.28, green: 0.38, blue: 0.32)
-        case .sob: return Color(red: 0.24, green: 0.32, blue: 0.30)
+        case .neutral: return Color(red: 0.35, green: 0.58, blue: 0.32)
+        case .happy: return Color(red: 0.40, green: 0.65, blue: 0.28)
+        case .sad: return Color(red: 0.32, green: 0.42, blue: 0.38)
+        case .sob: return Color(red: 0.28, green: 0.38, blue: 0.35)
         }
     }
 
@@ -267,17 +267,18 @@ struct TurtleSceneView: View {
 
             // Turtle (walks across scene, flips direction)
             ClaudeTurtleIcon(
-                size: min(height * 0.55, 22),
+                size: min(height * 0.75, 28),
                 animateLegs: (isWalking && !isSleeping) || (isProcessing && !isSleeping),
                 emotion: emotion,
                 isBlinking: isBlinking,
                 headExtension: headExtension,
                 isSleeping: isSleeping
             )
+            .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
             .scaleEffect(x: facingRight ? breathScale : -breathScale, y: breathScale, anchor: .bottom)
             .offset(
                 x: walkX * width + (emotion == .sob ? CGFloat(trembleX) : 0) + tailWag,
-                y: -(height * 0.35) + CGFloat(sin(bobPhase) * Double(bobAmplitude))
+                y: -(height * 0.25) + CGFloat(sin(bobPhase) * Double(bobAmplitude))
             )
             .rotationEffect(.degrees(swayAngle * swayDeg), anchor: .bottom)
         }
