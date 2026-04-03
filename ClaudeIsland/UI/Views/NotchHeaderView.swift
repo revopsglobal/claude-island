@@ -1309,9 +1309,8 @@ struct TurtleSceneView: View {
     // MARK: - Flower Logic
 
     private func spawnFlower() {
-        // Place flower on a visible edge (randomly left or right)
-        let side: CGFloat = Bool.random() ? -1 : 1
-        s.flowerX = side * CGFloat.random(in: 0.38 ... 0.44)
+        // Flower always on the right edge
+        s.flowerX = CGFloat.random(in: 0.40 ... 0.44)
         s.flowerEaten = false
         s.petalCount = 5
         s.petalRegrowing = false
