@@ -600,7 +600,7 @@ struct TurtleSceneView: View {
             // Flower with individually visible petals
             if s.flowerVisible {
                 Canvas { context, canvasSize in
-                    let s = min(height * 0.35, 14) / 14.0
+                    let sc = min(height * 0.35, 14) / 14.0
                     let cx = canvasSize.width / 2
                     let cy = canvasSize.height / 2
 
@@ -612,27 +612,28 @@ struct TurtleSceneView: View {
 
                     // Stem
                     let stem = Path { p in
-                        p.addRect(CGRect(x: cx - 1.5 * s, y: cy + 3 * s, width: 3 * s, height: 10 * s))
+                        p.addRect(CGRect(x: cx - 1.5 * sc, y: cy + 3 * sc, width: 3 * sc, height: 10 * sc))
                     }
                     context.fill(stem, with: .color(stemColor))
 
                     // Small leaf on stem
                     let leaf = Path { p in
-                        p.addEllipse(in: CGRect(x: cx + 1 * s, y: cy + 6 * s, width: 5 * s, height: 3 * s))
+                        p.addEllipse(in: CGRect(x: cx + 1 * sc, y: cy + 6 * sc, width: 5 * sc, height: 3 * sc))
                     }
                     context.fill(leaf, with: .color(leafColor))
 
                     // Petals (round ellipses arranged in a circle)
-                    let petalAngles: [Double] = [0, 72, 144, 216, 288]  // 5 petals evenly spaced
-                    let petalRadius: CGFloat = 5 * s
-                    let petalW: CGFloat = 5 * s
-                    let petalH: CGFloat = 7 * s
+                    let petalAngles: [Double] = [0, 72, 144, 216, 288]
+                    let petalRadius: CGFloat = 5 * sc
+                    let petalW: CGFloat = 5 * sc
+                    let petalH: CGFloat = 7 * sc
+                    let currentPetalCount = self.s.petalCount
 
                     for (i, angle) in petalAngles.enumerated() {
-                        guard i < s.petalCount else { continue }
+                        guard i < currentPetalCount else { continue }
                         let rad = angle * .pi / 180
                         let px = cx + cos(rad) * petalRadius - petalW / 2
-                        let py = cy - 1 * s + sin(rad) * petalRadius - petalH / 2
+                        let py = cy - 1 * sc + sin(rad) * petalRadius - petalH / 2
                         let petal = Path { p in
                             p.addEllipse(in: CGRect(x: px, y: py, width: petalW, height: petalH))
                         }
@@ -642,7 +643,7 @@ struct TurtleSceneView: View {
 
                     // Center (always visible)
                     let center = Path { p in
-                        p.addEllipse(in: CGRect(x: cx - 3 * s, y: cy - 4 * s, width: 6 * s, height: 6 * s))
+                        p.addEllipse(in: CGRect(x: cx - 3 * sc, y: cy - 4 * sc, width: 6 * sc, height: 6 * sc))
                     }
                     context.fill(center, with: .color(centerColor))
                 }
