@@ -129,7 +129,6 @@ struct InstanceRow: View {
     @State private var isHovered = false
     @State private var spinnerPhase = 0
     @State private var isYabaiAvailable = false
-    @State private var sessionCost: CostSummary = .zero
 
     private let claudeOrange = Color(red: 0.85, green: 0.47, blue: 0.34)
     private let spinnerSymbols = ["·", "✢", "✳", "∗", "✻", "✽"]
@@ -154,18 +153,10 @@ struct InstanceRow: View {
 
             // Text content
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(session.displayTitle)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-
-                    if sessionCost.sessionCost > 0 {
-                        Text(sessionCost.formattedCost)
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.35))
-                    }
-                }
+                Text(session.displayTitle)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
 
                 // Show tool call when waiting for approval, otherwise last activity
                 if isWaitingForApproval, let toolName = session.pendingToolName {
@@ -298,12 +289,6 @@ struct InstanceRow: View {
         .onHover { isHovered = $0 }
         .task {
             isYabaiAvailable = await WindowFinder.shared.isYabaiAvailable()
-            sessionCost = await CostTracker.shared.costForSession(session.sessionId)
-        }
-        .onChange(of: session.phase) { _, _ in
-            Task {
-                sessionCost = await CostTracker.shared.costForSession(session.sessionId)
-            }
         }
     }
 

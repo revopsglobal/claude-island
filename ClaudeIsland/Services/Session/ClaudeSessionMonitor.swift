@@ -53,20 +53,10 @@ class ClaudeSessionMonitor: ObservableObject {
                     }
                 }
 
-                // Cost tracking on file syncs
-                if event.shouldSyncFile {
-                    Task {
-                        await CostTracker.shared.updateCosts(sessionId: event.sessionId, cwd: event.cwd)
-                    }
-                }
-
                 if event.status == "ended" {
                     Task { @MainActor in
                         InterruptWatcherManager.shared.stopWatching(sessionId: event.sessionId)
                         EmotionManager.shared.removeSession(event.sessionId)
-                    }
-                    Task {
-                        await CostTracker.shared.removeSession(event.sessionId)
                     }
                 }
 

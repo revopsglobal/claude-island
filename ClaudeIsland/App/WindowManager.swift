@@ -16,11 +16,14 @@ class WindowManager {
 
     /// Set up or recreate the notch window
     func setupNotchWindow() -> NotchWindowController? {
-        // Use ScreenSelector for screen selection
-        let screenSelector = ScreenSelector.shared
-        screenSelector.refreshScreens()
+        // Use ScreenSelector for screen selection (MainActor-isolated)
+        let screen: NSScreen? = MainActor.assumeIsolated {
+            let screenSelector = ScreenSelector.shared
+            screenSelector.refreshScreens()
+            return screenSelector.selectedScreen
+        }
 
-        guard let screen = screenSelector.selectedScreen else {
+        guard let screen else {
             logger.warning("No screen found")
             return nil
         }

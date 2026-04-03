@@ -26,8 +26,6 @@ struct NotchView: View {
     @State private var isVisible: Bool = false
     @State private var isHovering: Bool = false
     @State private var isBouncing: Bool = false
-    @State private var sessionCosts: [String: CostSummary] = [:]
-    @State private var totalCost: CostSummary = .zero
 
     @Namespace private var activityNamespace
 
