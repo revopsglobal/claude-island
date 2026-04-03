@@ -18,13 +18,14 @@ struct ClaudeTurtleIcon: View {
     var headExtension: CGFloat = 0  // 0 = normal, negative = retracted, positive = extended
     var isSleeping: Bool = false
     var mouthOpen: Bool = false
+    var lookingUp: Bool = false
 
     @State private var legPhase: Int = 0
 
     private let legTimer = Timer.publish(every: 0.18, on: .main, in: .common).autoconnect()
 
     init(size: CGFloat = 16, animateLegs: Bool = false, emotion: CrabEmotion = .neutral,
-         isBlinking: Bool = false, headExtension: CGFloat = 0, isSleeping: Bool = false, mouthOpen: Bool = false) {
+         isBlinking: Bool = false, headExtension: CGFloat = 0, isSleeping: Bool = false, mouthOpen: Bool = false, lookingUp: Bool = false) {
         self.size = size
         self.animateLegs = animateLegs
         self.emotion = emotion
@@ -32,6 +33,7 @@ struct ClaudeTurtleIcon: View {
         self.headExtension = headExtension
         self.isSleeping = isSleeping
         self.mouthOpen = mouthOpen
+        self.lookingUp = lookingUp
     }
 
     // Emotion-based shell color (bright enough to pop against dark grass)
@@ -113,6 +115,9 @@ struct ClaudeTurtleIcon: View {
             } else if isBlinking {
                 // Blink: thin horizontal line
                 rect(50 + headX, 24, 3, 1, color: eyeColor)
+            } else if lookingUp {
+                // Looking up at user: eye shifted upward
+                rect(50 + headX, 19, 3, 3, color: eyeColor)
             } else {
                 switch emotion {
                 case .neutral:
@@ -198,6 +203,12 @@ struct TurtleSceneView: View {
     @State private var isEating: Bool = false
     @State private var mouthOpen: Bool = false
 
+    // Nature state
+    @State private var butterflies: [(x: CGFloat, y: CGFloat, phase: Double, speed: Double)] = []
+    @State private var hearts: [(x: CGFloat, y: CGFloat, opacity: Double, age: Double)] = []
+    @State private var raindrops: [(x: CGFloat, y: CGFloat)] = []
+    @State private var timePhase: Double = 0  // for butterfly/particle animation
+
     // Life state
     @State private var isBlinking: Bool = false
     @State private var headExtension: CGFloat = 0
@@ -205,6 +216,7 @@ struct TurtleSceneView: View {
     @State private var breathScale: CGFloat = 1.0
     @State private var lastActivityTime: Date = Date()
     @State private var tailWag: CGFloat = 0
+    @State private var lookingUp: Bool = false
 
     // Timers
     private let motionTimer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
@@ -238,11 +250,37 @@ struct TurtleSceneView: View {
         }
     }
 
-    // Grass colors
-    private let grassDark = Color(red: 0.18, green: 0.32, blue: 0.15)
-    private let grassLight = Color(red: 0.25, green: 0.42, blue: 0.20)
-    private let grassHighlight = Color(red: 0.30, green: 0.50, blue: 0.22)
-    private let dirtColor = Color(red: 0.22, green: 0.18, blue: 0.12)
+    // Day/night cycle based on actual time
+    private var daylight: CGFloat {
+        let hour = Calendar.current.component(.hour, from: Date())
+        // 0.0 = full night, 1.0 = full day
+        switch hour {
+        case 6 ..< 8: return CGFloat(hour - 6) / 2.0 * 0.7 + 0.3   // dawn
+        case 8 ..< 17: return 1.0                                     // day
+        case 17 ..< 20: return 1.0 - CGFloat(hour - 17) / 3.0 * 0.6 // dusk
+        case 20 ..< 22: return 0.4 - CGFloat(hour - 20) / 2.0 * 0.2 // evening
+        default: return 0.2                                            // night
+        }
+    }
+
+    private var isNighttime: Bool { daylight < 0.4 }
+
+    // Grass colors adjusted for time of day
+    private var grassDark: Color {
+        Color(red: 0.18 * daylight, green: 0.32 * daylight, blue: 0.15 * daylight)
+    }
+    private var grassLight: Color {
+        Color(red: 0.25 * daylight, green: 0.42 * daylight, blue: 0.20 * daylight)
+    }
+    private var grassHighlight: Color {
+        Color(red: 0.30 * daylight, green: 0.50 * daylight, blue: 0.22 * daylight)
+    }
+    private var dirtColor: Color {
+        Color(red: 0.22 * daylight, green: 0.18 * daylight, blue: 0.12 * daylight)
+    }
+    private var skyColor: Color {
+        isNighttime ? Color(red: 0.02, green: 0.02, blue: 0.08) : .clear
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -280,9 +318,80 @@ struct TurtleSceneView: View {
                     let c = Int(i) % 16 < 8 ? grassLight : grassHighlight
                     context.fill(tuft, with: .color(c))
                 }
+
+                // Stars/fireflies at night
+                if isNighttime {
+                    for i in 0 ..< 6 {
+                        let sx = CGFloat(i) * w / 6.0 + sin(timePhase * 0.5 + Double(i)) * 3
+                        let sy = CGFloat(3 + (i % 3) * 5) + sin(timePhase * 0.3 + Double(i) * 2) * 2
+                        let glow = 0.3 + sin(timePhase * 2 + Double(i) * 1.5) * 0.3
+                        let star = Path { p in
+                            p.addEllipse(in: CGRect(x: sx, y: sy, width: 2, height: 2))
+                        }
+                        context.fill(star, with: .color(Color.yellow.opacity(glow)))
+                    }
+                }
+
+                // Raindrops (when sad/sob)
+                if emotion == .sad || emotion == .sob {
+                    for drop in raindrops {
+                        let raindrop = Path { p in
+                            p.addRect(CGRect(x: drop.x, y: drop.y, width: 1, height: 3))
+                        }
+                        context.fill(raindrop, with: .color(Color(red: 0.5, green: 0.6, blue: 0.8).opacity(0.6)))
+                    }
+                }
             }
 
-            // Flower (appears when processing, turtle walks to eat it)
+            // Butterflies
+            ForEach(0 ..< butterflies.count, id: \.self) { i in
+                let b = butterflies[i]
+                Canvas { context, _ in
+                    let wingPhase = sin(timePhase * b.speed * 8)
+                    let wingW: CGFloat = 3 + CGFloat(wingPhase) * 1.5
+                    // Left wing
+                    let lw = Path { p in
+                        p.addEllipse(in: CGRect(x: -wingW, y: -2, width: wingW, height: 4))
+                    }
+                    // Right wing
+                    let rw = Path { p in
+                        p.addEllipse(in: CGRect(x: 1, y: -2, width: wingW, height: 4))
+                    }
+                    let colors: [Color] = [
+                        Color(red: 0.9, green: 0.6, blue: 0.2),
+                        Color(red: 0.6, green: 0.4, blue: 0.9),
+                        Color(red: 0.2, green: 0.7, blue: 0.9),
+                    ]
+                    let c = colors[i % colors.count]
+                    context.fill(lw, with: .color(c.opacity(0.8)))
+                    context.fill(rw, with: .color(c.opacity(0.8)))
+                    // Body
+                    let body = Path { p in
+                        p.addRect(CGRect(x: -0.5, y: -1.5, width: 1.5, height: 3))
+                    }
+                    context.fill(body, with: .color(.black.opacity(0.5)))
+                }
+                .frame(width: 12, height: 8)
+                .offset(
+                    x: b.x * width - width / 2,
+                    y: b.y * height - height / 2
+                )
+                .allowsHitTesting(false)
+            }
+
+            // Hearts (when happy)
+            ForEach(0 ..< hearts.count, id: \.self) { i in
+                let h = hearts[i]
+                Text("\u{2665}")
+                    .font(.system(size: 6))
+                    .foregroundColor(Color.red.opacity(h.opacity))
+                    .offset(
+                        x: h.x * width - width / 2,
+                        y: h.y * height - height
+                    )
+                    .allowsHitTesting(false)
+            }
+
             // Flower with individually visible petals
             if flowerVisible {
                 Canvas { context, canvasSize in
@@ -350,7 +459,8 @@ struct TurtleSceneView: View {
                 isBlinking: isBlinking,
                 headExtension: headExtension,
                 isSleeping: isSleeping,
-                mouthOpen: mouthOpen
+                mouthOpen: mouthOpen,
+                lookingUp: lookingUp
             )
             .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
             .scaleEffect(x: facingRight ? breathScale : -breathScale, y: breathScale, anchor: .bottom)
@@ -370,6 +480,41 @@ struct TurtleSceneView: View {
             // Breathing: subtle shell pulse
             let breathCycle = sin(bobPhase * 0.4) * 0.015
             breathScale = 1.0 + CGFloat(breathCycle)
+
+            // Nature animation clock
+            timePhase += 1.0 / 30.0
+
+            // Butterfly movement (gentle drift)
+            for i in 0 ..< butterflies.count {
+                butterflies[i].x += CGFloat(sin(timePhase * butterflies[i].speed + butterflies[i].phase)) * 0.002
+                butterflies[i].y += CGFloat(cos(timePhase * butterflies[i].speed * 0.7 + butterflies[i].phase)) * 0.003
+                // Wrap around
+                if butterflies[i].x < -0.1 { butterflies[i].x = 1.1 }
+                if butterflies[i].x > 1.1 { butterflies[i].x = -0.1 }
+                if butterflies[i].y < 0.05 { butterflies[i].y = 0.4 }
+                if butterflies[i].y > 0.5 { butterflies[i].y = 0.05 }
+            }
+
+            // Heart particles (float up and fade)
+            for i in (0 ..< hearts.count).reversed() {
+                hearts[i].y -= 0.01
+                hearts[i].opacity -= 0.015
+                hearts[i].age += 1.0 / 30.0
+                if hearts[i].opacity <= 0 {
+                    hearts.remove(at: i)
+                }
+            }
+
+            // Raindrops (fall and respawn)
+            if emotion == .sad || emotion == .sob {
+                for i in 0 ..< raindrops.count {
+                    raindrops[i].y += 2
+                    if raindrops[i].y > height {
+                        raindrops[i].y = 0
+                        raindrops[i].x = CGFloat.random(in: 0 ... width)
+                    }
+                }
+            }
 
             // Walking logic
             guard !isSleeping else { return }
@@ -446,6 +591,39 @@ struct TurtleSceneView: View {
                 }
             }
 
+            // Hearts when happy
+            if emotion == .happy && !isSleeping && Int.random(in: 0 ..< 4) == 0 {
+                hearts.append((
+                    x: CGFloat(walkX) + 0.5 + CGFloat.random(in: -0.02 ... 0.02),
+                    y: 0.6,
+                    opacity: 0.9,
+                    age: 0
+                ))
+                // Cap at 5 hearts
+                if hearts.count > 5 { hearts.removeFirst() }
+            }
+
+            // Rain management
+            if (emotion == .sad || emotion == .sob) && raindrops.count < 15 {
+                for _ in 0 ..< 3 {
+                    raindrops.append((
+                        x: CGFloat.random(in: 0 ... max(width, 1)),
+                        y: CGFloat.random(in: 0 ... max(height, 1))
+                    ))
+                }
+            } else if emotion != .sad && emotion != .sob && !raindrops.isEmpty {
+                raindrops.removeAll()
+            }
+
+            // Look up at user occasionally (breaks fourth wall)
+            if !isSleeping && !isEating && !lookingUp && Int.random(in: 0 ..< 40) == 0 {
+                lookingUp = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(Double.random(in: 1.0 ... 2.0)))
+                    lookingUp = false
+                }
+            }
+
             // Idle fidgets (random head movements and tail wags)
             if !isProcessing && !isSleeping {
                 // Head peek (occasionally extend/retract)
@@ -472,6 +650,17 @@ struct TurtleSceneView: View {
             // Always have a flower on the scene
             if !flowerVisible {
                 spawnFlower()
+            }
+            // Spawn 2-3 butterflies
+            if butterflies.isEmpty {
+                for _ in 0 ..< Int.random(in: 2 ... 3) {
+                    butterflies.append((
+                        x: CGFloat.random(in: 0.1 ... 0.9),
+                        y: CGFloat.random(in: 0.1 ... 0.4),
+                        phase: Double.random(in: 0 ... .pi * 2),
+                        speed: Double.random(in: 0.5 ... 1.5)
+                    ))
+                }
             }
         }
         .onChange(of: isProcessing) { wasProcessing, nowProcessing in
