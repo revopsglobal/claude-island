@@ -302,6 +302,7 @@ class TurtleSceneState: ObservableObject {
     @Published var sessionStartTime: Date = Date()
     @Published var musicNotes: [(x: CGFloat, y: CGFloat, opacity: Double)] = []
     @Published var cursorNearNotch: Bool = false
+    @Published var cursorX: CGFloat = 0  // normalized cursor X position relative to scene
 
     static let shared = TurtleSceneState()
 }
@@ -834,6 +835,21 @@ struct TurtleSceneView: View {
             flowerAndTurtle
         }
         .frame(width: width, height: height)
+        .onContinuousHover { phase in
+            switch phase {
+            case .active(let location):
+                s.cursorNearNotch = true
+                s.cursorX = (location.x / max(width, 1)) - 0.5  // -0.5 to 0.5
+                // Sheldon looks toward cursor when idle
+                if !s.isWalking && !s.isEating && !s.isSleeping {
+                    s.facingRight = s.cursorX > s.walkX
+                }
+            case .ended:
+                s.cursorNearNotch = false
+            @unknown default:
+                break
+            }
+        }
         .onReceive(motionTimer) { now in
             // Core motion
             s.bobPhase += (2.0 * .pi) / (bobSpeed * 30.0)
