@@ -17,19 +17,21 @@ struct ClaudeTurtleIcon: View {
     var isBlinking: Bool = false
     var headExtension: CGFloat = 0  // 0 = normal, negative = retracted, positive = extended
     var isSleeping: Bool = false
+    var mouthOpen: Bool = false
 
     @State private var legPhase: Int = 0
 
     private let legTimer = Timer.publish(every: 0.18, on: .main, in: .common).autoconnect()
 
     init(size: CGFloat = 16, animateLegs: Bool = false, emotion: CrabEmotion = .neutral,
-         isBlinking: Bool = false, headExtension: CGFloat = 0, isSleeping: Bool = false) {
+         isBlinking: Bool = false, headExtension: CGFloat = 0, isSleeping: Bool = false, mouthOpen: Bool = false) {
         self.size = size
         self.animateLegs = animateLegs
         self.emotion = emotion
         self.isBlinking = isBlinking
         self.headExtension = headExtension
         self.isSleeping = isSleeping
+        self.mouthOpen = mouthOpen
     }
 
     // Emotion-based shell color (bright enough to pop against dark grass)
@@ -125,8 +127,13 @@ struct ClaudeTurtleIcon: View {
             }
 
             // -- MOUTH --
-            if isSleeping {
-                // Sleeping: tiny "z" hint (no mouth)
+            if mouthOpen {
+                // Eating: mouth wide open
+                rect(51 + headX, 27, 5, 5, color: eyeColor)
+                // Inside of mouth (dark red)
+                rect(52 + headX, 28, 3, 3, color: Color(red: 0.5, green: 0.15, blue: 0.1))
+            } else if isSleeping {
+                // Sleeping: no mouth
             } else {
                 switch emotion {
                 case .happy:
@@ -188,6 +195,8 @@ struct TurtleSceneView: View {
     @State private var flowerEaten: Bool = false
     @State private var petalCount: Int = 5              // 5 petals, turtle eats them one by one
     @State private var petalRegrowing: Bool = false
+    @State private var isEating: Bool = false
+    @State private var mouthOpen: Bool = false
 
     // Life state
     @State private var isBlinking: Bool = false
@@ -336,11 +345,12 @@ struct TurtleSceneView: View {
             // Turtle (walks across scene, flips direction)
             ClaudeTurtleIcon(
                 size: min(height * 0.75, 28),
-                animateLegs: (isWalking && !isSleeping) || (isProcessing && !isSleeping),
+                animateLegs: (isWalking && !isSleeping && !isEating) || (isProcessing && !isSleeping && !isEating),
                 emotion: emotion,
                 isBlinking: isBlinking,
                 headExtension: headExtension,
-                isSleeping: isSleeping
+                isSleeping: isSleeping,
+                mouthOpen: mouthOpen
             )
             .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
             .scaleEffect(x: facingRight ? breathScale : -breathScale, y: breathScale, anchor: .bottom)
@@ -526,27 +536,42 @@ struct TurtleSceneView: View {
     private func eatFlower() {
         guard !flowerEaten else { return }
         flowerEaten = true
+        isEating = true
+        isWalking = false  // Stop walking to eat
 
-        // Eat petals one by one with head lunges
+        // Eat petals one by one with mouth chomping
         Task { @MainActor in
             for petal in stride(from: petalCount, to: 0, by: -1) {
-                // Head lunge
-                withAnimation(.spring(response: 0.12, dampingFraction: 0.5)) {
-                    headExtension = 4
+                // Open mouth + head forward
+                mouthOpen = true
+                withAnimation(.spring(response: 0.1, dampingFraction: 0.5)) {
+                    headExtension = 3
                 }
-                try? await Task.sleep(for: .milliseconds(200))
+                try? await Task.sleep(for: .milliseconds(250))
 
-                // Remove a petal
+                // Close mouth (chomp!) + remove a petal
+                mouthOpen = false
                 withAnimation(.easeOut(duration: 0.15)) {
                     petalCount = petal - 1
                 }
-
-                // Head back
                 withAnimation(.easeOut(duration: 0.1)) {
-                    headExtension = 0
+                    headExtension = 1
                 }
-                try? await Task.sleep(for: .milliseconds(250))
+                try? await Task.sleep(for: .milliseconds(200))
+
+                // Open mouth again for next bite
+                if petal - 1 > 0 {
+                    mouthOpen = true
+                    try? await Task.sleep(for: .milliseconds(150))
+                    mouthOpen = false
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
             }
+
+            // Done eating
+            mouthOpen = false
+            withAnimation(.easeOut(duration: 0.2)) { headExtension = 0 }
+            isEating = false
 
             // All petals eaten, turtle walks away
             petalRegrowing = true
