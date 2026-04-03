@@ -968,9 +968,10 @@ struct TurtleSceneView: View {
                     s.walkDirection = dir
                     return
                 }
-                // Arrived at resting spot
+                // Arrived at resting spot -- face away from notch
                 s.walkX = restTarget
                 s.isWalking = false
+                s.facingRight = restTarget > 0  // right side faces right, left side faces left
                 return
             }
             guard now > s.walkPauseUntil else { return }
