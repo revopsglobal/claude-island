@@ -502,8 +502,9 @@ struct TurtleSceneView: View {
 
     private func spawnFlower() {
         // Place flower on opposite side from turtle, on a visible edge
+        // Always place flower on far edges
         let side: CGFloat = walkX > 0 ? -1 : 1
-        flowerX = side * CGFloat.random(in: 0.28 ... 0.42)
+        flowerX = side * CGFloat.random(in: 0.42 ... 0.48)
         flowerEaten = false
         petalCount = 5
         petalRegrowing = false
