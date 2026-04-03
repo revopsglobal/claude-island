@@ -561,13 +561,9 @@ struct TurtleSceneView: View {
                     walkX += walkDirection * speed * 2  // 3x speed through center
                 }
 
-                // Check if turtle reached the flower (only when walking toward it)
-                if flowerVisible && !flowerEaten && !petalRegrowing && petalCount == 5 && abs(walkX - flowerX) < 0.05 {
-                    // Must be walking toward the flower, not past it
-                    let movingToward = (flowerX > walkX && walkDirection > 0) || (flowerX < walkX && walkDirection < 0)
-                    if movingToward {
-                        eatFlower()
-                    }
+                // Check if turtle reached the flower (only when walking toward it with full petals)
+                if flowerVisible && !flowerEaten && !petalRegrowing && petalCount >= 5 && abs(walkX - flowerX) < 0.06 {
+                    eatFlower()
                 }
             }
         }
@@ -704,9 +700,8 @@ struct TurtleSceneView: View {
     // MARK: - Flower Logic
 
     private func spawnFlower() {
-        // Place flower on opposite side from turtle, on a visible edge
-        // Always place flower on far edges
-        let side: CGFloat = walkX > 0 ? -1 : 1
+        // Place flower on a visible edge (randomly left or right)
+        let side: CGFloat = Bool.random() ? -1 : 1
         flowerX = side * CGFloat.random(in: 0.38 ... 0.44)
         flowerEaten = false
         petalCount = 5
@@ -718,12 +713,7 @@ struct TurtleSceneView: View {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
             flowerScale = 1.0
         }
-
-        // Point turtle toward flower
-        walkDirection = flowerX > walkX ? 1 : -1
-        facingRight = walkDirection > 0
-        isWalking = true
-        walkPauseUntil = .distantPast
+        // Don't redirect turtle -- let him walk naturally and eat when he passes by
     }
 
     private func eatFlower() {
@@ -795,11 +785,7 @@ struct TurtleSceneView: View {
             // Flower is fully regrown, turtle can come eat it again
             petalRegrowing = false
             flowerEaten = false
-
-            // Point turtle back toward flower
-            walkDirection = flowerX > walkX ? 1 : -1
-            facingRight = walkDirection > 0
-            isWalking = true
+            // Don't redirect turtle -- he'll eat it next time he walks past
         }
     }
 }
