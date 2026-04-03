@@ -561,9 +561,13 @@ struct TurtleSceneView: View {
                     walkX += walkDirection * speed * 2  // 3x speed through center
                 }
 
-                // Check if turtle reached the flower
-                if flowerVisible && !flowerEaten && abs(walkX - flowerX) < 0.05 {
-                    eatFlower()
+                // Check if turtle reached the flower (only when walking toward it)
+                if flowerVisible && !flowerEaten && !petalRegrowing && petalCount == 5 && abs(walkX - flowerX) < 0.05 {
+                    // Must be walking toward the flower, not past it
+                    let movingToward = (flowerX > walkX && walkDirection > 0) || (flowerX < walkX && walkDirection < 0)
+                    if movingToward {
+                        eatFlower()
+                    }
                 }
             }
         }
