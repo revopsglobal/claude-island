@@ -950,8 +950,9 @@ struct TurtleSceneView: View {
                 if s.rainbowOpacity <= 0 { s.showRainbow = false }
             }
 
-            // Walking logic -- only walks when Claude is processing
+            // Walking logic -- only walks when Claude is processing and not eating
             guard !s.isSleeping else { return }
+            guard !s.isEating else { return }
             guard isProcessing else {
                 s.isWalking = false
                 return
