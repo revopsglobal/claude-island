@@ -458,6 +458,12 @@ struct TurtleSceneView: View {
                 }
             }
         }
+        .onAppear {
+            // Always have a flower on the scene
+            if !flowerVisible {
+                spawnFlower()
+            }
+        }
         .onChange(of: isProcessing) { wasProcessing, nowProcessing in
             // Wake up when processing starts
             if nowProcessing && isSleeping {
@@ -465,20 +471,9 @@ struct TurtleSceneView: View {
             }
             lastActivityTime = Date()
 
-            // Spawn a flower when processing starts
+            // Spawn a new flower if there isn't one
             if nowProcessing && !flowerVisible {
                 spawnFlower()
-            }
-            // Remove flower when processing stops
-            if !nowProcessing && flowerVisible {
-                withAnimation(.easeOut(duration: 0.3)) {
-                    flowerScale = 0
-                }
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(300))
-                    flowerVisible = false
-                    flowerEaten = false
-                }
             }
         }
         .onChange(of: emotion) { _, newEmotion in
@@ -553,18 +548,14 @@ struct TurtleSceneView: View {
             }
 
             // All petals eaten, turtle walks away
-            // Start regrowing petals after turtle leaves
             petalRegrowing = true
             startPetalRegrowth()
 
-            // If still processing, turtle walks to other side then comes back
-            if isProcessing {
-                // Walk away from flower
-                let awayDirection: CGFloat = walkX > 0 ? -1 : 1
-                walkDirection = awayDirection
-                facingRight = walkDirection > 0
-                isWalking = true
-            }
+            // Walk away from flower
+            let awayDirection: CGFloat = walkX > 0 ? -1 : 1
+            walkDirection = awayDirection
+            facingRight = walkDirection > 0
+            isWalking = true
         }
     }
 
@@ -586,12 +577,10 @@ struct TurtleSceneView: View {
             petalRegrowing = false
             flowerEaten = false
 
-            if isProcessing {
-                // Point turtle back toward flower
-                walkDirection = flowerX > walkX ? 1 : -1
-                facingRight = walkDirection > 0
-                isWalking = true
-            }
+            // Point turtle back toward flower
+            walkDirection = flowerX > walkX ? 1 : -1
+            facingRight = walkDirection > 0
+            isWalking = true
         }
     }
 }
