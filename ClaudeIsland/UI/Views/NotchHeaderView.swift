@@ -954,6 +954,16 @@ struct TurtleSceneView: View {
             guard !s.isSleeping else { return }
             guard !s.isEating else { return }
             guard isProcessing else {
+                // When stopping, drift to nearest visible edge if behind notch
+                let centerZone: CGFloat = 0.15
+                if abs(s.walkX) < centerZone && !s.isWalking {
+                    // Nudge toward nearest edge so turtle is visible
+                    let targetEdge: CGFloat = s.walkX >= 0 ? 0.25 : -0.25
+                    let nudge: CGFloat = targetEdge > s.walkX ? 0.003 : -0.003
+                    s.walkX += nudge
+                    s.facingRight = nudge > 0
+                    return  // keep moving until out of center
+                }
                 s.isWalking = false
                 return
             }
