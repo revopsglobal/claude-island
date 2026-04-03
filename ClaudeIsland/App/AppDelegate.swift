@@ -27,11 +27,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         super.init()
         AppDelegate.shared = self
 
+        // Sparkle disabled for debug builds to avoid TCC permission prompts
+        #if !DEBUG
         do {
             try updater.start()
         } catch {
             print("Failed to start Sparkle updater: \(error)")
         }
+        #endif
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -50,6 +53,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleScreenChange()
         }
 
+        #if !DEBUG
         if updater.canCheckForUpdates {
             updater.checkForUpdates()
         }
@@ -58,6 +62,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let updater = self?.updater, updater.canCheckForUpdates else { return }
             updater.checkForUpdates()
         }
+        #endif
     }
 
     private func handleScreenChange() {
