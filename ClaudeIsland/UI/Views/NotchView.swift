@@ -74,29 +74,26 @@ struct NotchView: View {
     }
 
     /// Extra width for expanding activities (like Dynamic Island)
+    /// Wider than stock to give the turtle room to roam
     private var expansionWidth: CGFloat {
-        // Permission indicator adds width on left side only
         let permissionIndicatorWidth: CGFloat = hasPendingPermission ? 18 : 0
+        let turtleSceneWidth: CGFloat = 80  // wide enough for the turtle to feel spacious
 
-        // Expand for processing activity
         if activityCoordinator.expandingActivity.show {
             switch activityCoordinator.expandingActivity.type {
             case .claude:
-                let baseWidth = 2 * max(0, closedNotchSize.height - 12) + 20
-                return baseWidth + permissionIndicatorWidth
+                return turtleSceneWidth + sideWidth + permissionIndicatorWidth
             case .none:
                 break
             }
         }
 
-        // Expand for pending permissions (left indicator) or waiting for input (checkmark on right)
         if hasPendingPermission {
-            return 2 * max(0, closedNotchSize.height - 12) + 20 + permissionIndicatorWidth
+            return turtleSceneWidth + sideWidth + permissionIndicatorWidth
         }
 
-        // Waiting for input just shows checkmark on right, no extra left indicator
         if hasWaitingForInput {
-            return 2 * max(0, closedNotchSize.height - 12) + 20
+            return turtleSceneWidth + sideWidth
         }
 
         return 0
@@ -262,7 +259,7 @@ struct NotchView: View {
                     TurtleSceneView(
                         emotion: primaryEmotion,
                         isProcessing: isProcessing,
-                        width: sideWidth + 8,
+                        width: viewModel.status == .opened ? sideWidth + 8 : 80,
                         height: closedNotchSize.height
                     )
                     .matchedGeometryEffect(id: "turtle", in: activityNamespace, isSource: showClosedActivity)
@@ -272,7 +269,6 @@ struct NotchView: View {
                             .matchedGeometryEffect(id: "status-indicator", in: activityNamespace, isSource: showClosedActivity)
                     }
                 }
-                .frame(width: viewModel.status == .opened ? nil : sideWidth + (hasPendingPermission ? 18 : 0))
                 .padding(.leading, viewModel.status == .opened ? 8 : 0)
             }
 
