@@ -8,212 +8,228 @@
 import Combine
 import SwiftUI
 
-struct ClaudeCrabIcon: View {
+// MARK: - Pixel Art Turtle Icon
+
+struct ClaudeTurtleIcon: View {
     let size: CGFloat
-    let color: Color
     var animateLegs: Bool = false
     var emotion: CrabEmotion = .neutral
 
     @State private var legPhase: Int = 0
-    @State private var bobPhase: Double = 0
-    @State private var swayAngle: Double = 0
-    @State private var trembleOffset: Double = 0
 
-    // Timer for leg animation
-    private let legTimer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
-    // Timer for bob/sway animation (smoother, 60fps-ish)
-    private let motionTimer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
+    private let legTimer = Timer.publish(every: 0.18, on: .main, in: .common).autoconnect()
 
-    init(size: CGFloat = 16, color: Color = Color(red: 0.85, green: 0.47, blue: 0.34), animateLegs: Bool = false, emotion: CrabEmotion = .neutral) {
+    init(size: CGFloat = 16, animateLegs: Bool = false, emotion: CrabEmotion = .neutral) {
         self.size = size
-        self.color = color
         self.animateLegs = animateLegs
         self.emotion = emotion
     }
 
-    // MARK: - Emotion-driven motion parameters
-
-    private var bobAmplitude: CGFloat {
+    /// Emotion-based shell color
+    private var shellColor: Color {
         switch emotion {
-        case .neutral: return 1.5
-        case .happy: return 2.5
-        case .sad: return 0.5
-        case .sob: return 0
+        case .neutral: return Color(red: 0.35, green: 0.60, blue: 0.35)  // forest green
+        case .happy: return Color(red: 0.40, green: 0.70, blue: 0.30)    // bright green
+        case .sad: return Color(red: 0.35, green: 0.45, blue: 0.40)      // muted teal
+        case .sob: return Color(red: 0.30, green: 0.38, blue: 0.38)      // grey-green
         }
     }
 
-    private var bobDuration: Double {
+    private var skinColor: Color {
         switch emotion {
-        case .neutral: return 1.5
-        case .happy: return 0.8
-        case .sad: return 2.5
-        case .sob: return 0
+        case .neutral: return Color(red: 0.55, green: 0.75, blue: 0.40)
+        case .happy: return Color(red: 0.60, green: 0.82, blue: 0.38)
+        case .sad: return Color(red: 0.48, green: 0.58, blue: 0.45)
+        case .sob: return Color(red: 0.42, green: 0.50, blue: 0.42)
         }
     }
 
-    private var swayAmplitudeDeg: Double {
+    private var shellDetailColor: Color {
         switch emotion {
-        case .neutral: return 0.5
-        case .happy: return 2.0
-        case .sad: return 0.25
-        case .sob: return 0.15
-        }
-    }
-
-    private var trembleAmplitude: Double {
-        emotion == .sob ? 1.0 : 0
-    }
-
-    /// Emotion-based color tint
-    private var emotionColor: Color {
-        switch emotion {
-        case .neutral: return color
-        case .happy: return Color(red: 0.95, green: 0.55, blue: 0.25)  // warmer orange
-        case .sad: return Color(red: 0.65, green: 0.45, blue: 0.50)    // muted mauve
-        case .sob: return Color(red: 0.55, green: 0.40, blue: 0.50)    // deeper mauve
+        case .neutral: return Color(red: 0.28, green: 0.48, blue: 0.28)
+        case .happy: return Color(red: 0.32, green: 0.55, blue: 0.22)
+        case .sad: return Color(red: 0.28, green: 0.38, blue: 0.32)
+        case .sob: return Color(red: 0.24, green: 0.32, blue: 0.30)
         }
     }
 
     var body: some View {
         Canvas { context, canvasSize in
-            let scale = size / 52.0
-            let xOffset = (canvasSize.width - 66 * scale) / 2
+            let s = size / 48.0  // design grid is 48 units
+            let xOff = (canvasSize.width - 56 * s) / 2
 
-            // Left antenna
-            let leftAntenna = Path { p in
-                p.addRect(CGRect(x: 0, y: 13, width: 6, height: 13))
-            }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
-            context.fill(leftAntenna, with: .color(emotionColor))
-
-            // Right antenna
-            let rightAntenna = Path { p in
-                p.addRect(CGRect(x: 60, y: 13, width: 6, height: 13))
-            }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
-            context.fill(rightAntenna, with: .color(emotionColor))
-
-            // Animated legs
-            let baseLegPositions: [CGFloat] = [6, 18, 42, 54]
-            let baseLegHeight: CGFloat = 13
-
-            let legHeightOffsets: [[CGFloat]] = [
-                [3, -3, 3, -3],
-                [0, 0, 0, 0],
-                [-3, 3, -3, 3],
-                [0, 0, 0, 0],
-            ]
-
-            let currentHeightOffsets = animateLegs ? legHeightOffsets[legPhase % 4] : [CGFloat](repeating: 0, count: 4)
-
-            for (index, xPos) in baseLegPositions.enumerated() {
-                let heightOffset = currentHeightOffsets[index]
-                let legHeight = baseLegHeight + heightOffset
-                let leg = Path { p in
-                    p.addRect(CGRect(x: xPos, y: 39, width: 6, height: legHeight))
-                }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
-                context.fill(leg, with: .color(emotionColor))
+            func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, color: Color) {
+                let r = CGRect(x: (x + xOff / s) * s, y: y * s, width: w * s, height: h * s)
+                context.fill(Path(r), with: .color(color))
             }
 
-            // Main body
-            let body = Path { p in
-                p.addRect(CGRect(x: 6, y: 0, width: 54, height: 39))
-            }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
-            context.fill(body, with: .color(emotionColor))
+            // -- LEGS (4 stubby legs) --
+            let legOffsets: [[CGFloat]] = [
+                [2, -2, 2, -2],   // phase 0
+                [0, 0, 0, 0],     // phase 1
+                [-2, 2, -2, 2],   // phase 2
+                [0, 0, 0, 0],     // phase 3
+            ]
+            let currentLeg = animateLegs ? legOffsets[legPhase % 4] : [CGFloat](repeating: 0, count: 4)
+            let legPositions: [(CGFloat, CGFloat)] = [(8, 36), (18, 36), (32, 36), (42, 36)]
+            for (i, pos) in legPositions.enumerated() {
+                let h: CGFloat = 10 + currentLeg[i]
+                rect(pos.0, pos.1, 6, h, color: skinColor)
+            }
 
-            // Eyes - emotion-driven
+            // -- BODY (under shell) --
+            rect(6, 28, 44, 10, color: skinColor)
+
+            // -- SHELL (dome shape) --
+            // Shell base
+            rect(8, 8, 40, 22, color: shellColor)
+            // Shell top curve
+            rect(12, 4, 32, 6, color: shellColor)
+            // Shell details (hexagonal pattern hints)
+            rect(14, 10, 10, 8, color: shellDetailColor)
+            rect(26, 10, 10, 8, color: shellDetailColor)
+            rect(20, 20, 10, 8, color: shellDetailColor)
+            rect(34, 20, 8, 6, color: shellDetailColor)
+
+            // -- HEAD --
+            rect(46, 20, 10, 12, color: skinColor)
+
+            // -- TAIL --
+            rect(0, 30, 8, 4, color: skinColor)
+            rect(-2, 32, 4, 3, color: skinColor)
+
+            // -- EYES --
             let eyeColor: Color = .black
-            let leftEyeY: CGFloat
-            let rightEyeY: CGFloat
-            let eyeHeight: CGFloat
-
             switch emotion {
             case .neutral:
-                leftEyeY = 13; rightEyeY = 13; eyeHeight = 6.5
+                rect(50, 22, 3, 3, color: eyeColor)  // simple dot
             case .happy:
-                // Eyes slightly squinted (happy squint)
-                leftEyeY = 15; rightEyeY = 15; eyeHeight = 4.0
+                rect(50, 24, 3, 2, color: eyeColor)  // squinted
             case .sad:
-                // Eyes droopy (lower, taller)
-                leftEyeY = 16; rightEyeY = 16; eyeHeight = 5.0
+                rect(50, 23, 3, 4, color: eyeColor)  // droopy
             case .sob:
-                // Eyes wide (distressed)
-                leftEyeY = 11; rightEyeY = 11; eyeHeight = 9.0
+                rect(49, 21, 4, 5, color: eyeColor)  // wide open
             }
 
-            let leftEye = Path { p in
-                p.addRect(CGRect(x: 12, y: leftEyeY, width: 6, height: eyeHeight))
-            }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
-            context.fill(leftEye, with: .color(eyeColor))
-
-            let rightEye = Path { p in
-                p.addRect(CGRect(x: 48, y: rightEyeY, width: 6, height: eyeHeight))
-            }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
-            context.fill(rightEye, with: .color(eyeColor))
-
-            // Mouth - emotion-driven
+            // -- MOUTH --
             switch emotion {
             case .happy:
-                // Simple smile: two pixels forming a curve
-                let smile1 = Path { p in
-                    p.addRect(CGRect(x: 22, y: 28, width: 4, height: 3))
-                }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
-                let smile2 = Path { p in
-                    p.addRect(CGRect(x: 26, y: 30, width: 14, height: 3))
-                }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
-                let smile3 = Path { p in
-                    p.addRect(CGRect(x: 40, y: 28, width: 4, height: 3))
-                }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
-                context.fill(smile1, with: .color(eyeColor))
-                context.fill(smile2, with: .color(eyeColor))
-                context.fill(smile3, with: .color(eyeColor))
+                rect(51, 28, 4, 2, color: eyeColor)  // smile
             case .sad, .sob:
-                // Frown
-                let frown1 = Path { p in
-                    p.addRect(CGRect(x: 22, y: 32, width: 4, height: 3))
-                }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
-                let frown2 = Path { p in
-                    p.addRect(CGRect(x: 26, y: 30, width: 14, height: 3))
-                }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
-                let frown3 = Path { p in
-                    p.addRect(CGRect(x: 40, y: 32, width: 4, height: 3))
-                }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
-                context.fill(frown1, with: .color(eyeColor))
-                context.fill(frown2, with: .color(eyeColor))
-                context.fill(frown3, with: .color(eyeColor))
+                rect(51, 30, 4, 2, color: eyeColor)  // frown
             default:
-                break  // neutral: no mouth
+                break
             }
         }
-        .frame(width: size * (66.0 / 52.0), height: size)
-        // Bob animation (vertical)
-        .offset(y: bobAmplitude > 0 ? CGFloat(sin(bobPhase) * Double(bobAmplitude)) : 0)
-        // Sway animation (rotation)
-        .rotationEffect(.degrees(swayAngle * swayAmplitudeDeg))
-        // Tremble animation (horizontal shake)
-        .offset(x: CGFloat(trembleOffset * trembleAmplitude))
+        .frame(width: size * (56.0 / 48.0), height: size)
         .onReceive(legTimer) { _ in
             if animateLegs {
                 legPhase = (legPhase + 1) % 4
-            }
-        }
-        .onReceive(motionTimer) { _ in
-            // Bob: smooth sine wave
-            if bobDuration > 0 {
-                bobPhase += (2.0 * .pi) / (bobDuration * 30.0)
-            }
-            // Sway: slower sine
-            swayAngle = sin(bobPhase * 0.7)
-            // Tremble: rapid random shake for sob
-            if emotion == .sob {
-                trembleOffset = Double.random(in: -1.0 ... 1.0)
-            } else {
-                trembleOffset = 0
             }
         }
         .animation(.easeInOut(duration: 0.3), value: emotion)
     }
 }
 
-// Pixel art permission indicator icon
+// MARK: - Turtle Scene (grass island with animated turtle)
+
+struct TurtleSceneView: View {
+    var emotion: CrabEmotion = .neutral
+    var isProcessing: Bool = false
+    let width: CGFloat
+    let height: CGFloat
+
+    @State private var bobPhase: Double = 0
+    @State private var swayAngle: Double = 0
+    @State private var trembleX: Double = 0
+
+    private let motionTimer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
+
+    private var bobAmplitude: CGFloat {
+        switch emotion {
+        case .neutral: return 1.2
+        case .happy: return 2.0
+        case .sad: return 0.4
+        case .sob: return 0
+        }
+    }
+
+    private var bobSpeed: Double {
+        isProcessing ? 0.6 : 1.5
+    }
+
+    private var swayDeg: Double {
+        switch emotion {
+        case .neutral: return 0.5
+        case .happy: return 1.5
+        case .sad: return 0.2
+        case .sob: return 0.1
+        }
+    }
+
+    // Grass colors
+    private let grassDark = Color(red: 0.18, green: 0.32, blue: 0.15)
+    private let grassLight = Color(red: 0.25, green: 0.42, blue: 0.20)
+    private let grassHighlight = Color(red: 0.30, green: 0.50, blue: 0.22)
+    private let dirtColor = Color(red: 0.22, green: 0.18, blue: 0.12)
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            // Grass island
+            Canvas { context, canvasSize in
+                let w = canvasSize.width
+                let h = canvasSize.height
+                let grassTop = h * 0.55
+
+                // Dirt/ground layer
+                let dirt = Path { p in
+                    p.addRect(CGRect(x: 0, y: grassTop + 4, width: w, height: h - grassTop - 4))
+                }
+                context.fill(dirt, with: .color(dirtColor))
+
+                // Grass surface (slightly wavy)
+                let grass = Path { p in
+                    p.move(to: CGPoint(x: 0, y: grassTop + 4))
+                    for x in stride(from: 0, through: w, by: 2) {
+                        let y = grassTop + sin(x * 0.15) * 2
+                        p.addLine(to: CGPoint(x: x, y: y))
+                    }
+                    p.addLine(to: CGPoint(x: w, y: h))
+                    p.addLine(to: CGPoint(x: 0, y: h))
+                    p.closeSubpath()
+                }
+                context.fill(grass, with: .color(grassDark))
+
+                // Grass highlights (pixel tufts)
+                for i in stride(from: CGFloat(3), to: w, by: 8) {
+                    let tuftY = grassTop + sin(i * 0.15) * 2 - 3
+                    let tuft = Path { p in
+                        p.addRect(CGRect(x: i, y: tuftY, width: 2, height: 4))
+                    }
+                    let c = Int(i) % 16 < 8 ? grassLight : grassHighlight
+                    context.fill(tuft, with: .color(c))
+                }
+            }
+
+            // Turtle (centered, animated)
+            ClaudeTurtleIcon(size: min(height * 0.55, 22), animateLegs: isProcessing, emotion: emotion)
+                .offset(
+                    x: emotion == .sob ? CGFloat(trembleX * 1.0) : 0,
+                    y: -(height * 0.35) + CGFloat(sin(bobPhase) * Double(bobAmplitude))
+                )
+                .rotationEffect(.degrees(swayAngle * swayDeg), anchor: .bottom)
+        }
+        .frame(width: width, height: height)
+        .onReceive(motionTimer) { _ in
+            bobPhase += (2.0 * .pi) / (bobSpeed * 30.0)
+            swayAngle = sin(bobPhase * 0.7)
+            trembleX = emotion == .sob ? Double.random(in: -1.0 ... 1.0) : 0
+        }
+    }
+}
+
+// MARK: - Pixel art permission indicator icon
+
 struct PermissionIndicatorIcon: View {
     let size: CGFloat
     let color: Color
@@ -223,13 +239,12 @@ struct PermissionIndicatorIcon: View {
         self.color = color
     }
 
-    // Visible pixel positions from the SVG (at 30x30 scale)
     private let pixels: [(CGFloat, CGFloat)] = [
-        (7, 7), (7, 11),           // Left column
-        (11, 3),                    // Top left
-        (15, 3), (15, 19), (15, 27), // Center column
-        (19, 3), (19, 15),          // Right of center
-        (23, 7), (23, 11)           // Right column
+        (7, 7), (7, 11),
+        (11, 3),
+        (15, 3), (15, 19), (15, 27),
+        (19, 3), (19, 15),
+        (23, 7), (23, 11)
     ]
 
     var body: some View {
@@ -251,7 +266,8 @@ struct PermissionIndicatorIcon: View {
     }
 }
 
-// Pixel art "ready for input" indicator icon (checkmark/done shape)
+// MARK: - Pixel art "ready for input" indicator icon
+
 struct ReadyForInputIndicatorIcon: View {
     let size: CGFloat
     let color: Color
@@ -261,15 +277,14 @@ struct ReadyForInputIndicatorIcon: View {
         self.color = color
     }
 
-    // Checkmark shape pixel positions (at 30x30 scale)
     private let pixels: [(CGFloat, CGFloat)] = [
-        (5, 15),                    // Start of checkmark
-        (9, 19),                    // Down stroke
-        (13, 23),                   // Bottom of checkmark
-        (17, 19),                   // Up stroke begins
-        (21, 15),                   // Up stroke
-        (25, 11),                   // Up stroke
-        (29, 7)                     // End of checkmark
+        (5, 15),
+        (9, 19),
+        (13, 23),
+        (17, 19),
+        (21, 15),
+        (25, 11),
+        (29, 7)
     ]
 
     var body: some View {

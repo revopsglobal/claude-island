@@ -256,13 +256,17 @@ struct NotchView: View {
     @ViewBuilder
     private var headerRow: some View {
         HStack(spacing: 0) {
-            // Left side - crab + optional permission indicator (visible when processing, pending, or waiting for input)
+            // Left side - turtle scene + optional permission indicator
             if showClosedActivity {
                 HStack(spacing: 4) {
-                    ClaudeCrabIcon(size: 14, animateLegs: isProcessing, emotion: primaryEmotion)
-                        .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: showClosedActivity)
+                    TurtleSceneView(
+                        emotion: primaryEmotion,
+                        isProcessing: isProcessing,
+                        width: sideWidth + 8,
+                        height: closedNotchSize.height
+                    )
+                    .matchedGeometryEffect(id: "turtle", in: activityNamespace, isSource: showClosedActivity)
 
-                    // Permission indicator only (amber) - waiting for input shows checkmark on right
                     if hasPendingPermission {
                         PermissionIndicatorIcon(size: 14, color: Color(red: 0.85, green: 0.47, blue: 0.34))
                             .matchedGeometryEffect(id: "status-indicator", in: activityNamespace, isSource: showClosedActivity)
@@ -314,11 +318,10 @@ struct NotchView: View {
     @ViewBuilder
     private var openedHeaderContent: some View {
         HStack(spacing: 12) {
-            // Show static crab only if not showing activity in headerRow
-            // (headerRow handles crab + indicator when showClosedActivity is true)
+            // Show static turtle only if not showing activity in headerRow
             if !showClosedActivity {
-                ClaudeCrabIcon(size: 14, emotion: primaryEmotion)
-                    .matchedGeometryEffect(id: "crab", in: activityNamespace, isSource: !showClosedActivity)
+                ClaudeTurtleIcon(size: 14, emotion: primaryEmotion)
+                    .matchedGeometryEffect(id: "turtle", in: activityNamespace, isSource: !showClosedActivity)
                     .padding(.leading, 8)
             }
 
