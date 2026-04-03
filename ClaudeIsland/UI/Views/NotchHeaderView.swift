@@ -954,15 +954,16 @@ struct TurtleSceneView: View {
             guard !s.isSleeping else { return }
             guard !s.isEating else { return }
             guard isProcessing else {
-                // When stopping, drift to nearest visible edge if behind notch
-                let centerZone: CGFloat = 0.15
-                if abs(s.walkX) < centerZone && !s.isWalking {
-                    // Nudge toward nearest edge so turtle is visible
-                    let targetEdge: CGFloat = s.walkX >= 0 ? 0.25 : -0.25
-                    let nudge: CGFloat = targetEdge > s.walkX ? 0.003 : -0.003
-                    s.walkX += nudge
-                    s.facingRight = nudge > 0
-                    return  // keep moving until out of center
+                // When stopping, keep walking to nearest visible edge if behind notch
+                let notchHalfWidth: CGFloat = 0.25  // notch covers roughly center 50% of scene
+                if abs(s.walkX) < notchHalfWidth {
+                    // Still behind the notch -- keep walking in current direction until clear
+                    let speed: CGFloat = 0.003
+                    s.walkX += s.walkDirection * speed
+                    // If we somehow have no direction, pick one
+                    if s.walkDirection == 0 { s.walkDirection = s.walkX >= 0 ? 1 : -1 }
+                    s.facingRight = s.walkDirection > 0
+                    return
                 }
                 s.isWalking = false
                 return
