@@ -199,6 +199,11 @@ struct NotchView: View {
         .onChange(of: sessionMonitor.instances) { _, instances in
             handleProcessingChange()
             handleWaitingForInputChange(instances)
+            // Wire luminbeat detection to turtle scene
+            TurtleSceneState.shared.hasLuminbeatSession = instances.contains {
+                $0.projectName.lowercased().contains("luminbeat") ||
+                $0.cwd.lowercased().contains("luminbeat")
+            }
         }
     }
 

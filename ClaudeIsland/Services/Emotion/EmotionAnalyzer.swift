@@ -2,9 +2,8 @@
 //  EmotionAnalyzer.swift
 //  ClaudeIsland
 //
-//  Analyzes user prompts for sentiment using Claude Haiku.
-//  Reads API key from Keychain or ~/.claude/settings.json.
-//  Ported from Notchi (sk-ruban/notchi) with adaptations.
+//  Analyzes user prompts for sentiment using the local `claude` CLI.
+//  Uses the user's existing Claude Code authentication (Max subscription).
 //
 
 import Foundation
@@ -16,120 +15,138 @@ private let logger = Logger(subsystem: "com.claudeisland", category: "EmotionAna
 final class EmotionAnalyzer {
     static let shared = EmotionAnalyzer()
 
-    private static let validEmotions: Set<String> = ["happy", "sad", "neutral"]
-
-    private static let systemPrompt = """
-        Classify the emotional tone of the user's message into exactly one emotion and an intensity score.
-        Emotions: happy, sad, neutral.
-        Happy: explicit praise ("great job", "thank you!"), gratitude, celebration, positive profanity ("LETS FUCKING GO").
-        Sad: frustration, anger, insults, complaints, feeling stuck, disappointment, negative profanity.
-        Neutral: instructions, requests, task descriptions, questions, enthusiasm about work, factual statements. \
-        Exclamation marks or urgency about a task do NOT make it happy -- only genuine positive sentiment toward the AI or outcome does.
-        Default to neutral when unsure. Most coding instructions are neutral regardless of tone.
-        Intensity: 0.0 (barely noticeable) to 1.0 (very strong). ALL CAPS text indicates stronger emotion -- \
-        increase intensity by 0.2-0.3 compared to the same message in lowercase.
-        Reply with ONLY valid JSON: {"emotion": "...", "intensity": ...}
-        """
+    nonisolated private static let validEmotions: Set<String> = ["happy", "sad", "neutral"]
 
     private init() {}
 
     func analyze(_ prompt: String) async -> (emotion: String, intensity: Double) {
-        guard let config = resolveAPIConfig() else {
-            logger.info("No API config available for emotion analysis, using neutral")
-            return ("neutral", 0.0)
-        }
-
         do {
-            return try await callHaiku(prompt: prompt, config: config)
+            return try await callCLI(prompt: prompt)
         } catch {
             logger.error("Emotion analysis failed: \(error.localizedDescription)")
             return ("neutral", 0.0)
         }
     }
 
-    // MARK: - API Config Resolution
+    // MARK: - CLI Call
 
-    private struct APIConfig {
-        let url: URL
-        let apiKey: String
-        let model: String
-    }
+    private func callCLI(prompt: String) async throws -> (emotion: String, intensity: Double) {
+        let truncated = String(prompt.prefix(300))
 
-    private func resolveAPIConfig() -> APIConfig? {
-        // Try ~/.claude/settings.json
-        let settingsURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/settings.json")
+        let cliPrompt = """
+        Classify the emotional tone of this user message into exactly one emotion and intensity score.
+        Emotions: happy, sad, neutral.
+        Happy: explicit praise, gratitude, celebration, positive profanity.
+        Sad: frustration, anger, insults, complaints, disappointment, negative profanity.
+        Neutral: instructions, requests, questions, task descriptions. Most coding instructions are neutral.
+        Intensity: 0.0 to 1.0. ALL CAPS increases intensity by 0.2-0.3.
+        Reply with ONLY valid JSON: {"emotion": "...", "intensity": ...}
 
-        guard let data = try? Data(contentsOf: settingsURL),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let env = json["env"] as? [String: String]
-        else {
-            return nil
+        Message: \(truncated)
+        """
+
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                let process = Process()
+                let pipe = Pipe()
+
+                // Find claude CLI
+                let claudePath = Self.findClaudeCLI()
+                guard let path = claudePath else {
+                    continuation.resume(returning: ("neutral", 0.0))
+                    return
+                }
+
+                process.executableURL = URL(fileURLWithPath: path)
+                process.arguments = [
+                    "-p",
+                    "--model", "haiku",
+                    "--no-session-persistence",
+                    cliPrompt
+                ]
+                process.standardOutput = pipe
+                process.standardError = FileHandle.nullDevice
+
+                // Inherit the full environment so claude CLI gets NODE_PATH, NVM dirs, etc.
+                var env = Foundation.ProcessInfo.processInfo.environment
+                // Ensure common CLI paths are present
+                let extraPaths = "/usr/local/bin:/opt/homebrew/bin"
+                if let existing = env["PATH"] {
+                    env["PATH"] = extraPaths + ":" + existing
+                } else {
+                    env["PATH"] = extraPaths + ":/usr/bin:/bin"
+                }
+                process.environment = env
+
+                do {
+                    try process.run()
+                    process.waitUntilExit()
+
+                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    guard let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                          !output.isEmpty else {
+                        logger.info("Empty CLI output, defaulting to neutral")
+                        continuation.resume(returning: ("neutral", 0.0))
+                        return
+                    }
+
+                    // Extract JSON from output (might have extra text)
+                    var cleaned = output
+                    if let start = cleaned.firstIndex(of: "{"), let end = cleaned.lastIndex(of: "}") {
+                        cleaned = String(cleaned[start ... end])
+                    }
+
+                    if let jsonData = cleaned.data(using: .utf8),
+                       let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                       let emotion = json["emotion"] as? String,
+                       let intensity = json["intensity"] as? Double {
+                        let validEmotion = Self.validEmotions.contains(emotion) ? emotion : "neutral"
+                        let clampedIntensity = min(max(intensity, 0.0), 1.0)
+                        logger.info("[Emotion CLI] \(validEmotion) (\(String(format: "%.2f", clampedIntensity)))")
+                        continuation.resume(returning: (validEmotion, clampedIntensity))
+                    } else {
+                        logger.info("Could not parse CLI output: \(output.prefix(100))")
+                        continuation.resume(returning: ("neutral", 0.0))
+                    }
+                } catch {
+                    logger.error("CLI process error: \(error.localizedDescription)")
+                    continuation.resume(returning: ("neutral", 0.0))
+                }
+            }
         }
-
-        let authToken = env["ANTHROPIC_AUTH_TOKEN"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !authToken.isEmpty else { return nil }
-
-        let baseURL = env["ANTHROPIC_BASE_URL"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "https://api.anthropic.com"
-        let model = env["ANTHROPIC_DEFAULT_HAIKU_MODEL"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "claude-haiku-4-5-20251001"
-
-        guard let apiURL = URL(string: "\(baseURL)/v1/messages") else { return nil }
-
-        return APIConfig(url: apiURL, apiKey: authToken, model: model)
     }
 
-    // MARK: - Haiku API Call
+    // MARK: - Find claude CLI
 
-    private struct HaikuResponse: Decodable {
-        let content: [ContentBlock]
-        struct ContentBlock: Decodable {
-            let text: String?
-        }
-    }
-
-    private struct EmotionResponse: Decodable {
-        let emotion: String
-        let intensity: Double
-    }
-
-    private func callHaiku(prompt: String, config: APIConfig) async throws -> (emotion: String, intensity: Double) {
-        var request = URLRequest(url: config.url)
-        request.httpMethod = "POST"
-        request.setValue(config.apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "content-type")
-
-        let body: [String: Any] = [
-            "model": config.model,
-            "max_tokens": 50,
-            "system": Self.systemPrompt,
-            "messages": [
-                ["role": "user", "content": String(prompt.prefix(500))],
-            ],
+    nonisolated private static func findClaudeCLI() -> String? {
+        let candidates = [
+            "/usr/local/bin/claude",
+            "/opt/homebrew/bin/claude",
+            NSHomeDirectory() + "/.claude/local/claude",
+            NSHomeDirectory() + "/.nvm/versions/node/v24.13.1/bin/claude",
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw URLError(.badServerResponse)
+        for path in candidates {
+            if FileManager.default.isExecutableFile(atPath: path) {
+                return path
+            }
         }
 
-        let haikuResponse = try JSONDecoder().decode(HaikuResponse.self, from: data)
-        guard let text = haikuResponse.content.first?.text else {
-            throw URLError(.cannotParseResponse)
+        // Try `which claude`
+        let which = Process()
+        let pipe = Pipe()
+        which.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        which.arguments = ["claude"]
+        which.standardOutput = pipe
+        which.standardError = FileHandle.nullDevice
+        try? which.run()
+        which.waitUntilExit()
+        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let result, !result.isEmpty, FileManager.default.isExecutableFile(atPath: result) {
+            return result
         }
 
-        // Extract JSON from potential markdown code blocks
-        var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let start = cleaned.firstIndex(of: "{"), let end = cleaned.lastIndex(of: "}") {
-            cleaned = String(cleaned[start ... end])
-        }
-
-        let emotionResponse = try JSONDecoder().decode(EmotionResponse.self, from: Data(cleaned.utf8))
-        let emotion = Self.validEmotions.contains(emotionResponse.emotion) ? emotionResponse.emotion : "neutral"
-        let intensity = min(max(emotionResponse.intensity, 0.0), 1.0)
-
-        return (emotion, intensity)
+        return nil
     }
 }

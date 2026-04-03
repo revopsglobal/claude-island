@@ -82,14 +82,19 @@ struct ClaudeTurtleIcon: View {
         }
     }
 
+    private var hatPadding: CGFloat {
+        hatType == .none ? 0 : 12
+    }
+
     var body: some View {
         Canvas { context, canvasSize in
             let s = size / 48.0
             let xOff = (canvasSize.width - 56 * s) / 2
             let headX = headExtension
+            let yPad = hatPadding * s  // shift everything down to make room for hat
 
             func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, color: Color) {
-                let r = CGRect(x: (x + xOff / s) * s, y: y * s, width: w * s, height: h * s)
+                let r = CGRect(x: (x + xOff / s) * s, y: y * s + yPad, width: w * s, height: h * s)
                 context.fill(Path(r), with: .color(color))
             }
 
@@ -184,30 +189,34 @@ struct ClaudeTurtleIcon: View {
                 // -- HAT --
                 switch hatType {
                 case .nightcap:
-                    // Droopy pointed cap
-                    rect(16, 0, 24, 4, color: Color(red: 0.3, green: 0.3, blue: 0.7))
-                    rect(20, -4, 16, 5, color: Color(red: 0.3, green: 0.3, blue: 0.7))
-                    rect(28, -7, 8, 4, color: Color(red: 0.3, green: 0.3, blue: 0.7))
-                    // Pompom
-                    rect(30, -9, 4, 4, color: .white)
+                    // Droopy cap sitting on top of head, tip flops slightly right
+                    let capColor = Color(red: 0.3, green: 0.3, blue: 0.7)
+                    rect(46 + headX, 16, 12, 5, color: capColor)   // base band on head
+                    rect(48 + headX, 12, 8, 5, color: capColor)    // middle section
+                    rect(50 + headX, 8, 6, 5, color: capColor)     // upper section
+                    rect(53 + headX, 5, 5, 4, color: capColor)     // tip drooping forward
+                    // Pompom at tip
+                    rect(55 + headX, 3, 4, 4, color: .white)
                 case .santa:
-                    // Red santa hat
-                    rect(10, 1, 36, 4, color: .white) // brim
-                    rect(14, -3, 28, 5, color: Color(red: 0.85, green: 0.15, blue: 0.15))
-                    rect(18, -7, 20, 5, color: Color(red: 0.85, green: 0.15, blue: 0.15))
-                    rect(26, -10, 10, 4, color: Color(red: 0.85, green: 0.15, blue: 0.15))
-                    rect(30, -12, 5, 4, color: .white) // pompom
+                    // Red santa hat on head
+                    let santaRed = Color(red: 0.85, green: 0.15, blue: 0.15)
+                    rect(44 + headX, 18, 14, 3, color: .white)  // brim on head
+                    rect(45 + headX, 14, 12, 5, color: santaRed)
+                    rect(47 + headX, 10, 9, 5, color: santaRed)
+                    rect(49 + headX, 7, 6, 4, color: santaRed)
+                    rect(52 + headX, 5, 4, 4, color: .white)    // pompom
                 case .party:
-                    // Cone hat
-                    rect(18, 0, 20, 4, color: Color(red: 0.9, green: 0.4, blue: 0.7))
-                    rect(22, -4, 12, 5, color: Color(red: 0.4, green: 0.7, blue: 0.9))
-                    rect(26, -7, 6, 4, color: Color(red: 0.9, green: 0.8, blue: 0.2))
-                    rect(27, -9, 4, 3, color: Color(red: 0.9, green: 0.4, blue: 0.3))
+                    // Cone hat on head
+                    rect(45 + headX, 17, 12, 4, color: Color(red: 0.9, green: 0.4, blue: 0.7))
+                    rect(47 + headX, 13, 8, 5, color: Color(red: 0.4, green: 0.7, blue: 0.9))
+                    rect(49 + headX, 10, 5, 4, color: Color(red: 0.9, green: 0.8, blue: 0.2))
+                    rect(50 + headX, 8, 4, 3, color: Color(red: 0.9, green: 0.4, blue: 0.3))
                 case .tophat:
-                    // Top hat for new year
-                    rect(12, 1, 32, 3, color: Color(red: 0.15, green: 0.15, blue: 0.15))
-                    rect(16, -8, 24, 10, color: Color(red: 0.15, green: 0.15, blue: 0.15))
-                    rect(16, -2, 24, 2, color: Color(red: 0.6, green: 0.5, blue: 0.2)) // band
+                    // Top hat on head
+                    let hatBlack = Color(red: 0.15, green: 0.15, blue: 0.15)
+                    rect(44 + headX, 18, 14, 3, color: hatBlack)  // brim
+                    rect(46 + headX, 10, 10, 9, color: hatBlack)  // crown
+                    rect(46 + headX, 15, 10, 2, color: Color(red: 0.6, green: 0.5, blue: 0.2)) // band
                 case .none:
                     break
                 }
@@ -224,7 +233,7 @@ struct ClaudeTurtleIcon: View {
                 }
             }
         }
-        .frame(width: size * (56.0 / 48.0), height: size)
+        .frame(width: size * (56.0 / 48.0), height: size + hatPadding * (size / 48.0))
         .onReceive(legTimer) { _ in
             if animateLegs {
                 legPhase = (legPhase + 1) % 4
@@ -303,6 +312,10 @@ class TurtleSceneState: ObservableObject {
     @Published var musicNotes: [(x: CGFloat, y: CGFloat, opacity: Double)] = []
     @Published var cursorNearNotch: Bool = false
     @Published var cursorX: CGFloat = 0  // normalized cursor X position relative to scene
+    @Published var hasLuminbeatSession: Bool = false  // any active session in luminbeat repo
+
+    // Puddles (after rain)
+    @Published var puddles: [(x: CGFloat, opacity: Double)] = []
 
     static let shared = TurtleSceneState()
 }
@@ -363,6 +376,8 @@ struct TurtleSceneView: View {
     }
 
     private var isNighttime: Bool { daylight < 0.4 }
+
+
 
     // Grass colors adjusted for time of day
     private var grassDark: Color {
@@ -731,6 +746,25 @@ struct TurtleSceneView: View {
                     .allowsHitTesting(false)
             }
 
+            // Puddles (after rain evaporates)
+            ForEach(0 ..< s.puddles.count, id: \.self) { i in
+                let puddle = s.puddles[i]
+                Canvas { context, _ in
+                    let water = Path { p in
+                        p.addEllipse(in: CGRect(x: -4, y: -1.5, width: 8, height: 3))
+                    }
+                    context.fill(water, with: .color(Color(red: 0.4, green: 0.5, blue: 0.75).opacity(puddle.opacity * 0.6)))
+                    // Highlight
+                    let shine = Path { p in
+                        p.addEllipse(in: CGRect(x: -2, y: -1, width: 3, height: 1.5))
+                    }
+                    context.fill(shine, with: .color(Color.white.opacity(puddle.opacity * 0.3)))
+                }
+                .frame(width: 12, height: 6)
+                .offset(x: puddle.x * width, y: -(height * 0.05))
+                .allowsHitTesting(false)
+            }
+
     }
 
     @ViewBuilder
@@ -840,9 +874,16 @@ struct TurtleSceneView: View {
             case .active(let location):
                 s.cursorNearNotch = true
                 s.cursorX = (location.x / max(width, 1)) - 0.5  // -0.5 to 0.5
-                // Sheldon looks toward cursor when idle
+                // Sheldon looks toward cursor when idle and nudges toward it
                 if !s.isWalking && !s.isEating && !s.isSleeping {
                     s.facingRight = s.cursorX > s.walkX
+                    // Gentle nudge toward cursor (very slow creep)
+                    let dist = s.cursorX - s.walkX
+                    if abs(dist) > 0.05 {
+                        s.walkX += dist * 0.008  // ease toward cursor
+                        // Clamp to edges
+                        s.walkX = max(-0.45, min(0.45, s.walkX))
+                    }
                 }
             case .ended:
                 s.cursorNearNotch = false
@@ -949,6 +990,14 @@ struct TurtleSceneView: View {
             if s.snailVisible {
                 s.snailX += 0.0002
                 if s.snailX > 0.5 { s.snailX = -0.5 }
+            }
+
+            // Puddle evaporation
+            for i in (0 ..< s.puddles.count).reversed() {
+                s.puddles[i].opacity -= 0.001
+                if s.puddles[i].opacity <= 0 {
+                    s.puddles.remove(at: i)
+                }
             }
 
             // Music notes (float up and fade)
@@ -1116,10 +1165,14 @@ struct TurtleSceneView: View {
                 s.snailX = -0.5
             }
 
-            // Music notes when a session with "luminbeat" in the name is active
-            // (Detected by checking if any processing session has luminbeat in the project name)
-            // For now, just check periodically if there's a luminbeat-looking flower eating happening
-            // This is a placeholder -- actual session name detection would need to come from NotchView
+            // Music notes when a luminbeat session is active
+            if s.hasLuminbeatSession && isProcessing && s.musicNotes.count < 4 && Int.random(in: 0 ..< 6) == 0 {
+                s.musicNotes.append((
+                    x: CGFloat(s.walkX) + 0.5 + CGFloat.random(in: -0.05 ... 0.05),
+                    y: 0.7,
+                    opacity: 0.9
+                ))
+            }
 
             // Footprints while walking
             if s.isWalking && isProcessing && Int.random(in: 0 ..< 4) == 0 {
@@ -1272,6 +1325,20 @@ struct TurtleSceneView: View {
                 s.errorStreak += 1
             } else if newEmotion == .happy || newEmotion == .neutral {
                 s.errorStreak = 0
+            }
+
+            // Puddles after rain clears (sad/sob -> neutral/happy)
+            if (oldEmotion == .sad || oldEmotion == .sob) && (newEmotion == .happy || newEmotion == .neutral) {
+                // Spawn 3-5 puddles where rain was
+                let puddleCount = Int.random(in: 3 ... 5)
+                for _ in 0 ..< puddleCount {
+                    s.puddles.append((
+                        x: CGFloat.random(in: -0.4 ... 0.4),
+                        opacity: Double.random(in: 0.6 ... 1.0)
+                    ))
+                }
+                // Cap puddles
+                if s.puddles.count > 8 { s.puddles = Array(s.puddles.suffix(8)) }
             }
 
             // Rainbow after rain clears (sad/sob -> happy)
