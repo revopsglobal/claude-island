@@ -391,11 +391,11 @@ struct NotchView: View {
             // Hide activity when done
             activityCoordinator.hideActivity()
 
-            // Delay hiding the notch until animation completes
-            // Don't hide on non-notched devices - users need a visible target
-            if viewModel.status == .closed && viewModel.hasPhysicalNotch {
+            // Keep visible when sessions exist (turtle scene stays)
+            // Only hide when truly no sessions
+            if viewModel.status == .closed && viewModel.hasPhysicalNotch && sessionMonitor.instances.isEmpty {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if !isAnyProcessing && !hasPendingPermission && !hasWaitingForInput && viewModel.status == .closed {
+                    if sessionMonitor.instances.isEmpty && viewModel.status == .closed {
                         isVisible = false
                     }
                 }
@@ -414,8 +414,9 @@ struct NotchView: View {
         case .closed:
             // Don't hide on non-notched devices - users need a visible target
             guard viewModel.hasPhysicalNotch else { return }
+            // Keep visible when sessions exist (turtle scene stays)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                if viewModel.status == .closed && !isAnyProcessing && !hasPendingPermission && !hasWaitingForInput && !activityCoordinator.expandingActivity.show {
+                if viewModel.status == .closed && sessionMonitor.instances.isEmpty {
                     isVisible = false
                 }
             }
