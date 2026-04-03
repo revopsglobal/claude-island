@@ -999,8 +999,8 @@ struct TurtleSceneView: View {
                     s.walkX += s.walkDirection * speed * 2  // 3x speed through center
                 }
 
-                // Check if turtle reached the flower (only when walking toward it with full petals)
-                if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount >= 5 && abs(s.walkX - s.flowerX) < 0.06 {
+                // Check if turtle reached the flower
+                if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && abs(s.walkX - s.flowerX) < 0.10 {
                     eatFlower()
                 }
             }
