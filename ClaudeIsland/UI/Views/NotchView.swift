@@ -77,7 +77,7 @@ struct NotchView: View {
     /// Symmetric expansion on both sides for the turtle's grass island
     /// Always expanded when there are sessions so the turtle has a home
     private var expansionWidth: CGFloat {
-        let perSide: CGFloat = 65
+        let perSide: CGFloat = 85
 
         // Always show the scene when there are active sessions
         if !sessionMonitor.instances.isEmpty {

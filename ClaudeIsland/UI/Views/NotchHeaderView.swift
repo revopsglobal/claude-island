@@ -955,8 +955,8 @@ struct TurtleSceneView: View {
             guard !s.isEating else { return }
             guard isProcessing else {
                 // Walk to resting spot when idle (visible edges, not behind notch)
-                let leftRest: CGFloat = -0.44
-                let rightRest: CGFloat = 0.44
+                let leftRest: CGFloat = -0.45
+                let rightRest: CGFloat = 0.45
                 let restTarget = s.walkDirection >= 0 ? rightRest : leftRest
                 let distToRest = abs(s.walkX - restTarget)
 
