@@ -404,24 +404,18 @@ struct NotchView: View {
 
     private func handleProcessingChange() {
         if isAnyProcessing || hasPendingPermission {
-            // Show claude activity when processing or waiting for permission
             activityCoordinator.showActivity(type: .claude)
-            isVisible = true
-        } else if hasWaitingForInput {
-            // Keep visible for waiting-for-input but hide the processing spinner
-            activityCoordinator.hideActivity()
-            isVisible = true
         } else {
-            // Hide activity when done
             activityCoordinator.hideActivity()
+        }
 
-            // Keep visible when sessions exist (turtle scene stays)
-            // Only hide when truly no sessions
-            if viewModel.status == .closed && viewModel.hasPhysicalNotch && sessionMonitor.instances.isEmpty {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if sessionMonitor.instances.isEmpty && viewModel.status == .closed {
-                        isVisible = false
-                    }
+        // Always visible when sessions exist (turtle lives here)
+        if !sessionMonitor.instances.isEmpty {
+            isVisible = true
+        } else if viewModel.status == .closed && viewModel.hasPhysicalNotch {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if self.sessionMonitor.instances.isEmpty && self.viewModel.status == .closed {
+                    self.isVisible = false
                 }
             }
         }
@@ -436,12 +430,13 @@ struct NotchView: View {
                 waitingForInputTimestamps.removeAll()
             }
         case .closed:
-            // Don't hide on non-notched devices - users need a visible target
             guard viewModel.hasPhysicalNotch else { return }
-            // Keep visible when sessions exist (turtle scene stays)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                if viewModel.status == .closed && sessionMonitor.instances.isEmpty {
-                    isVisible = false
+            // Only hide when truly no sessions left
+            if sessionMonitor.instances.isEmpty {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    if self.viewModel.status == .closed && self.sessionMonitor.instances.isEmpty {
+                        self.isVisible = false
+                    }
                 }
             }
         }
