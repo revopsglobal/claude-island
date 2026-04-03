@@ -176,7 +176,7 @@ class NotchViewModel: ObservableObject {
                 self.notchClose()
             }
             hoverTimer = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: workItem)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
         }
     }
 
