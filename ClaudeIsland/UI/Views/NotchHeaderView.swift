@@ -8,6 +8,16 @@
 import Combine
 import SwiftUI
 
+// MARK: - Turtle Hat Types
+
+enum TurtleHat {
+    case none
+    case nightcap     // midnight coding
+    case santa        // December
+    case party        // birthday / milestones
+    case tophat       // new year
+}
+
 // MARK: - Pixel Art Turtle Icon
 
 struct ClaudeTurtleIcon: View {
@@ -19,13 +29,18 @@ struct ClaudeTurtleIcon: View {
     var isSleeping: Bool = false
     var mouthOpen: Bool = false
     var lookingUp: Bool = false
+    var hiddenInShell: Bool = false   // error streak: only eyes peek out
+    var hatType: TurtleHat = .none
+    var shellProgress: CGFloat = 0    // 0-1 fill for task progress
 
     @State private var legPhase: Int = 0
 
     private let legTimer = Timer.publish(every: 0.18, on: .main, in: .common).autoconnect()
 
     init(size: CGFloat = 16, animateLegs: Bool = false, emotion: CrabEmotion = .neutral,
-         isBlinking: Bool = false, headExtension: CGFloat = 0, isSleeping: Bool = false, mouthOpen: Bool = false, lookingUp: Bool = false) {
+         isBlinking: Bool = false, headExtension: CGFloat = 0, isSleeping: Bool = false,
+         mouthOpen: Bool = false, lookingUp: Bool = false,
+         hiddenInShell: Bool = false, hatType: TurtleHat = .none, shellProgress: CGFloat = 0) {
         self.size = size
         self.animateLegs = animateLegs
         self.emotion = emotion
@@ -34,6 +49,9 @@ struct ClaudeTurtleIcon: View {
         self.isSleeping = isSleeping
         self.mouthOpen = mouthOpen
         self.lookingUp = lookingUp
+        self.hiddenInShell = hiddenInShell
+        self.hatType = hatType
+        self.shellProgress = shellProgress
     }
 
     // Emotion-based shell color (bright enough to pop against dark grass)
@@ -75,92 +93,135 @@ struct ClaudeTurtleIcon: View {
                 context.fill(Path(r), with: .color(color))
             }
 
-            // -- LEGS --
-            let legOffsets: [[CGFloat]] = [
-                [2, -2, 2, -2],
-                [0, 0, 0, 0],
-                [-2, 2, -2, 2],
-                [0, 0, 0, 0],
-            ]
-            let currentLeg = animateLegs ? legOffsets[legPhase % 4] : [CGFloat](repeating: 0, count: 4)
-            let legPositions: [(CGFloat, CGFloat)] = [(8, 36), (18, 36), (32, 36), (42, 36)]
-            for (i, pos) in legPositions.enumerated() {
-                let h: CGFloat = 10 + currentLeg[i]
-                rect(pos.0, pos.1, 6, h, color: skinColor)
-            }
-
-            // -- BODY --
-            rect(6, 28, 44, 10, color: skinColor)
-
-            // -- SHELL --
-            rect(8, 8, 40, 22, color: shellColor)
-            rect(12, 4, 32, 6, color: shellColor)
-            rect(14, 10, 10, 8, color: shellDetailColor)
-            rect(26, 10, 10, 8, color: shellDetailColor)
-            rect(20, 20, 10, 8, color: shellDetailColor)
-            rect(34, 20, 8, 6, color: shellDetailColor)
-
-            // -- HEAD (with extension) --
-            rect(46 + headX, 20, 10, 12, color: skinColor)
-
-            // -- TAIL --
-            rect(0, 30, 8, 4, color: skinColor)
-            rect(-2, 32, 4, 3, color: skinColor)
-
-            // -- EYES --
-            let eyeColor: Color = .black
-            if isSleeping {
-                // Sleeping: closed eyes (horizontal lines)
-                rect(50 + headX, 24, 4, 1.5, color: eyeColor)
-            } else if isBlinking {
-                // Blink: thin horizontal line
-                rect(50 + headX, 24, 3, 1, color: eyeColor)
-            } else if lookingUp {
-                // Looking up at user: eye shifted upward
-                rect(50 + headX, 19, 3, 3, color: eyeColor)
+            if hiddenInShell {
+                // -- HIDDEN IN SHELL (error streak) --
+                // Just shell sitting on ground, eyes peeking from front
+                rect(8, 14, 40, 22, color: shellColor)
+                rect(12, 10, 32, 6, color: shellColor)
+                rect(14, 16, 10, 8, color: shellDetailColor)
+                rect(26, 16, 10, 8, color: shellDetailColor)
+                rect(20, 26, 10, 6, color: shellDetailColor)
+                // Tiny eyes peeking out front
+                let eyeColor: Color = .black
+                rect(46, 28, 3, 3, color: skinColor)  // skin around eyes
+                rect(47, 29, 2, 2, color: eyeColor)   // eyes
             } else {
-                switch emotion {
-                case .neutral:
-                    rect(50 + headX, 22, 3, 3, color: eyeColor)
-                case .happy:
-                    rect(50 + headX, 24, 3, 2, color: eyeColor)
-                case .sad:
-                    rect(50 + headX, 23, 3, 4, color: eyeColor)
-                case .sob:
-                    rect(49 + headX, 21, 4, 5, color: eyeColor)
+                // -- LEGS --
+                let legOffsets: [[CGFloat]] = [
+                    [2, -2, 2, -2],
+                    [0, 0, 0, 0],
+                    [-2, 2, -2, 2],
+                    [0, 0, 0, 0],
+                ]
+                let currentLeg = animateLegs ? legOffsets[legPhase % 4] : [CGFloat](repeating: 0, count: 4)
+                let legPositions: [(CGFloat, CGFloat)] = [(8, 36), (18, 36), (32, 36), (42, 36)]
+                for (i, pos) in legPositions.enumerated() {
+                    let lh: CGFloat = 10 + currentLeg[i]
+                    rect(pos.0, pos.1, 6, lh, color: skinColor)
                 }
-            }
 
-            // -- MOUTH --
-            if mouthOpen {
-                // Eating: mouth wide open
-                rect(51 + headX, 27, 5, 5, color: eyeColor)
-                // Inside of mouth (dark red)
-                rect(52 + headX, 28, 3, 3, color: Color(red: 0.5, green: 0.15, blue: 0.1))
-            } else if isSleeping {
-                // Sleeping: no mouth
-            } else {
-                switch emotion {
-                case .happy:
-                    rect(51 + headX, 28, 4, 2, color: eyeColor)
-                case .sad, .sob:
-                    rect(51 + headX, 30, 4, 2, color: eyeColor)
-                default:
+                // -- BODY --
+                rect(6, 28, 44, 10, color: skinColor)
+
+                // -- SHELL --
+                rect(8, 8, 40, 22, color: shellColor)
+                rect(12, 4, 32, 6, color: shellColor)
+                rect(14, 10, 10, 8, color: shellDetailColor)
+                rect(26, 10, 10, 8, color: shellDetailColor)
+                rect(20, 20, 10, 8, color: shellDetailColor)
+                rect(34, 20, 8, 6, color: shellDetailColor)
+
+                // -- SHELL PROGRESS (fills from left) --
+                if shellProgress > 0 {
+                    let pw = 38 * shellProgress
+                    let progressColor = Color(red: 0.3, green: 0.75, blue: 0.4).opacity(0.4)
+                    rect(9, 9, pw, 20, color: progressColor)
+                }
+
+                // -- HEAD (with extension) --
+                rect(46 + headX, 20, 10, 12, color: skinColor)
+
+                // -- TAIL --
+                rect(0, 30, 8, 4, color: skinColor)
+                rect(-2, 32, 4, 3, color: skinColor)
+
+                // -- EYES --
+                let eyeColor: Color = .black
+                if isSleeping {
+                    rect(50 + headX, 24, 4, 1.5, color: eyeColor)
+                } else if isBlinking {
+                    rect(50 + headX, 24, 3, 1, color: eyeColor)
+                } else if lookingUp {
+                    rect(50 + headX, 19, 3, 3, color: eyeColor)
+                } else {
+                    switch emotion {
+                    case .neutral:
+                        rect(50 + headX, 22, 3, 3, color: eyeColor)
+                    case .happy:
+                        rect(50 + headX, 24, 3, 2, color: eyeColor)
+                    case .sad:
+                        rect(50 + headX, 23, 3, 4, color: eyeColor)
+                    case .sob:
+                        rect(49 + headX, 21, 4, 5, color: eyeColor)
+                    }
+                }
+
+                // -- MOUTH --
+                if mouthOpen {
+                    rect(51 + headX, 27, 5, 5, color: eyeColor)
+                    rect(52 + headX, 28, 3, 3, color: Color(red: 0.5, green: 0.15, blue: 0.1))
+                } else if !isSleeping {
+                    switch emotion {
+                    case .happy:
+                        rect(51 + headX, 28, 4, 2, color: eyeColor)
+                    case .sad, .sob:
+                        rect(51 + headX, 30, 4, 2, color: eyeColor)
+                    default:
+                        break
+                    }
+                }
+
+                // -- HAT --
+                switch hatType {
+                case .nightcap:
+                    // Droopy pointed cap
+                    rect(16, 0, 24, 4, color: Color(red: 0.3, green: 0.3, blue: 0.7))
+                    rect(20, -4, 16, 5, color: Color(red: 0.3, green: 0.3, blue: 0.7))
+                    rect(28, -7, 8, 4, color: Color(red: 0.3, green: 0.3, blue: 0.7))
+                    // Pompom
+                    rect(30, -9, 4, 4, color: .white)
+                case .santa:
+                    // Red santa hat
+                    rect(10, 1, 36, 4, color: .white) // brim
+                    rect(14, -3, 28, 5, color: Color(red: 0.85, green: 0.15, blue: 0.15))
+                    rect(18, -7, 20, 5, color: Color(red: 0.85, green: 0.15, blue: 0.15))
+                    rect(26, -10, 10, 4, color: Color(red: 0.85, green: 0.15, blue: 0.15))
+                    rect(30, -12, 5, 4, color: .white) // pompom
+                case .party:
+                    // Cone hat
+                    rect(18, 0, 20, 4, color: Color(red: 0.9, green: 0.4, blue: 0.7))
+                    rect(22, -4, 12, 5, color: Color(red: 0.4, green: 0.7, blue: 0.9))
+                    rect(26, -7, 6, 4, color: Color(red: 0.9, green: 0.8, blue: 0.2))
+                    rect(27, -9, 4, 3, color: Color(red: 0.9, green: 0.4, blue: 0.3))
+                case .tophat:
+                    // Top hat for new year
+                    rect(12, 1, 32, 3, color: Color(red: 0.15, green: 0.15, blue: 0.15))
+                    rect(16, -8, 24, 10, color: Color(red: 0.15, green: 0.15, blue: 0.15))
+                    rect(16, -2, 24, 2, color: Color(red: 0.6, green: 0.5, blue: 0.2)) // band
+                case .none:
                     break
                 }
-            }
 
-            // -- SLEEP Zs (when sleeping) --
-            if isSleeping {
-                let zColor = Color.white.opacity(0.5)
-                // Small z
-                rect(54 + headX, 14, 4, 1, color: zColor)
-                rect(55 + headX, 15, 2, 1, color: zColor)
-                rect(54 + headX, 16, 4, 1, color: zColor)
-                // Bigger Z
-                rect(58 + headX, 8, 5, 1.5, color: zColor)
-                rect(60 + headX, 9.5, 3, 1.5, color: zColor)
-                rect(58 + headX, 11, 5, 1.5, color: zColor)
+                // -- SLEEP Zs --
+                if isSleeping {
+                    let zColor = Color.white.opacity(0.5)
+                    rect(54 + headX, 14, 4, 1, color: zColor)
+                    rect(55 + headX, 15, 2, 1, color: zColor)
+                    rect(54 + headX, 16, 4, 1, color: zColor)
+                    rect(58 + headX, 8, 5, 1.5, color: zColor)
+                    rect(60 + headX, 9.5, 3, 1.5, color: zColor)
+                    rect(58 + headX, 11, 5, 1.5, color: zColor)
+                }
             }
         }
         .frame(width: size * (56.0 / 48.0), height: size)
@@ -207,7 +268,22 @@ struct TurtleSceneView: View {
     @State private var butterflies: [(x: CGFloat, y: CGFloat, phase: Double, speed: Double)] = []
     @State private var hearts: [(x: CGFloat, y: CGFloat, opacity: Double, age: Double)] = []
     @State private var raindrops: [(x: CGFloat, y: CGFloat)] = []
-    @State private var timePhase: Double = 0  // for butterfly/particle animation
+    @State private var seasonalParticles: [(x: CGFloat, y: CGFloat, drift: CGFloat, speed: CGFloat)] = []
+    @State private var confetti: [(x: CGFloat, y: CGFloat, color: Int, speed: CGFloat)] = []
+    @State private var timePhase: Double = 0
+
+    // Creature visitors
+    @State private var birdX: CGFloat = -0.2
+    @State private var birdVisible: Bool = false
+    @State private var birdLanded: Bool = false
+    @State private var wormVisible: Bool = false
+    @State private var wormY: CGFloat = 0       // 0 = hidden, negative = poking out
+
+    // Interaction
+    @State private var spinAngle: Double = 0
+    @State private var promptCount: Int = 0
+    @State private var errorStreak: Int = 0
+    @State private var hiddenInShell: Bool = false
 
     // Life state
     @State private var isBlinking: Bool = false
@@ -280,6 +356,36 @@ struct TurtleSceneView: View {
     }
     private var skyColor: Color {
         isNighttime ? Color(red: 0.02, green: 0.02, blue: 0.08) : .clear
+    }
+
+    // Season based on month
+    private enum Season { case spring, summer, autumn, winter }
+    private var currentSeason: Season {
+        let month = Calendar.current.component(.month, from: Date())
+        switch month {
+        case 3 ... 5: return .spring
+        case 6 ... 8: return .summer
+        case 9 ... 11: return .autumn
+        default: return .winter
+        }
+    }
+
+    // Hat based on date/time
+    private var currentHat: TurtleHat {
+        let cal = Calendar.current
+        let hour = cal.component(.hour, from: Date())
+        let month = cal.component(.month, from: Date())
+        let day = cal.component(.day, from: Date())
+
+        // Midnight coding (11pm - 4am)
+        if hour >= 23 || hour < 4 { return .nightcap }
+        // December = santa
+        if month == 12 { return .santa }
+        // Jan 1 = top hat
+        if month == 1 && day == 1 { return .tophat }
+        // Confetti active = party hat
+        if !confetti.isEmpty { return .party }
+        return .none
     }
 
     var body: some View {
@@ -392,6 +498,87 @@ struct TurtleSceneView: View {
                     .allowsHitTesting(false)
             }
 
+            // Seasonal particles (snow, cherry blossoms, leaves)
+            ForEach(0 ..< seasonalParticles.count, id: \.self) { i in
+                let p = seasonalParticles[i]
+                Canvas { context, _ in
+                    switch currentSeason {
+                    case .winter:
+                        // Snowflake
+                        let snow = Path { path in path.addEllipse(in: CGRect(x: -1.5, y: -1.5, width: 3, height: 3)) }
+                        context.fill(snow, with: .color(.white.opacity(0.8)))
+                    case .spring:
+                        // Cherry blossom petal
+                        let petal = Path { path in path.addEllipse(in: CGRect(x: -2, y: -1, width: 4, height: 3)) }
+                        context.fill(petal, with: .color(Color(red: 1.0, green: 0.7, blue: 0.8).opacity(0.7)))
+                    case .autumn:
+                        // Falling leaf
+                        let leaf = Path { path in path.addEllipse(in: CGRect(x: -2, y: -1.5, width: 4, height: 3)) }
+                        context.fill(leaf, with: .color(Color(red: 0.85, green: 0.5, blue: 0.15).opacity(0.7)))
+                    case .summer:
+                        break  // no particles in summer (butterflies are enough)
+                    }
+                }
+                .frame(width: 6, height: 6)
+                .offset(x: p.x - width / 2, y: p.y)
+                .allowsHitTesting(false)
+            }
+
+            // Confetti (milestones)
+            ForEach(0 ..< confetti.count, id: \.self) { i in
+                let c = confetti[i]
+                let colors: [Color] = [.red, .yellow, .blue, .green, .orange, .purple]
+                Rectangle()
+                    .fill(colors[c.color % colors.count])
+                    .frame(width: 3, height: 3)
+                    .offset(x: c.x - width / 2, y: c.y)
+                    .allowsHitTesting(false)
+            }
+
+            // Bird visitor
+            if birdVisible {
+                Canvas { context, _ in
+                    let birdColor = Color(red: 0.6, green: 0.35, blue: 0.2)
+                    // Body
+                    let body = Path { p in p.addEllipse(in: CGRect(x: -3, y: -2, width: 7, height: 5)) }
+                    context.fill(body, with: .color(birdColor))
+                    // Head
+                    let head = Path { p in p.addEllipse(in: CGRect(x: 3, y: -3, width: 4, height: 4)) }
+                    context.fill(head, with: .color(birdColor))
+                    // Beak
+                    let beak = Path { p in p.addRect(CGRect(x: 6, y: -1.5, width: 3, height: 2)) }
+                    context.fill(beak, with: .color(Color(red: 0.9, green: 0.7, blue: 0.2)))
+                    // Eye
+                    let eye = Path { p in p.addEllipse(in: CGRect(x: 4.5, y: -2, width: 1.5, height: 1.5)) }
+                    context.fill(eye, with: .color(.black))
+                    // Wing (if not landed, show flap)
+                    if !birdLanded {
+                        let wing = Path { p in p.addEllipse(in: CGRect(x: -2, y: -5, width: 6, height: 4)) }
+                        context.fill(wing, with: .color(birdColor.opacity(0.7)))
+                    }
+                }
+                .frame(width: 16, height: 12)
+                .offset(
+                    x: birdX * width,
+                    y: birdLanded ? -(height * 0.3) : -(height * 0.6 + CGFloat(sin(timePhase * 3)) * 3)
+                )
+                .allowsHitTesting(false)
+            }
+
+            // Worm poking out of dirt
+            if wormVisible {
+                Canvas { context, _ in
+                    let wormColor = Color(red: 0.7, green: 0.45, blue: 0.35)
+                    let body = Path { p in p.addRoundedRect(in: CGRect(x: -1.5, y: 0, width: 3, height: 8), cornerSize: CGSize(width: 1.5, height: 1.5)) }
+                    context.fill(body, with: .color(wormColor))
+                    let eye = Path { p in p.addEllipse(in: CGRect(x: -0.5, y: 1, width: 1.5, height: 1.5)) }
+                    context.fill(eye, with: .color(.black))
+                }
+                .frame(width: 6, height: 10)
+                .offset(x: CGFloat.random(in: -0.3 ... 0.3) * width, y: wormY)
+                .allowsHitTesting(false)
+            }
+
             // Flower with individually visible petals
             if flowerVisible {
                 Canvas { context, canvasSize in
@@ -460,7 +647,10 @@ struct TurtleSceneView: View {
                 headExtension: headExtension,
                 isSleeping: isSleeping,
                 mouthOpen: mouthOpen,
-                lookingUp: lookingUp
+                lookingUp: lookingUp,
+                hiddenInShell: hiddenInShell,
+                hatType: currentHat,
+                shellProgress: 0
             )
             .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
             .scaleEffect(x: facingRight ? breathScale : -breathScale, y: breathScale, anchor: .bottom)
@@ -468,7 +658,17 @@ struct TurtleSceneView: View {
                 x: walkX * width + (emotion == .sob ? CGFloat(trembleX) : 0) + tailWag,
                 y: -(height * 0.25) + CGFloat(sin(bobPhase) * Double(bobAmplitude))
             )
-            .rotationEffect(.degrees(swayAngle * swayDeg), anchor: .bottom)
+            .rotationEffect(.degrees(swayAngle * swayDeg + spinAngle), anchor: .bottom)
+            .onTapGesture {
+                // Click turtle → spin!
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.4)) {
+                    spinAngle += 360
+                }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(600))
+                    withAnimation(.easeOut(duration: 0.2)) { spinAngle = 0 }
+                }
+            }
         }
         .frame(width: width, height: height)
         .onReceive(motionTimer) { now in
@@ -511,8 +711,36 @@ struct TurtleSceneView: View {
                     raindrops[i].y += 2
                     if raindrops[i].y > height {
                         raindrops[i].y = 0
-                        raindrops[i].x = CGFloat.random(in: 0 ... width)
+                        raindrops[i].x = CGFloat.random(in: 0 ... max(width, 1))
                     }
+                }
+            }
+
+            // Seasonal particles (drift and fall)
+            for i in 0 ..< seasonalParticles.count {
+                seasonalParticles[i].y += seasonalParticles[i].speed
+                seasonalParticles[i].x += seasonalParticles[i].drift + CGFloat(sin(timePhase + Double(i))) * 0.3
+                if seasonalParticles[i].y > height {
+                    seasonalParticles[i].y = -5
+                    seasonalParticles[i].x = CGFloat.random(in: 0 ... max(width, 1))
+                }
+            }
+
+            // Confetti (fall and fade)
+            for i in (0 ..< confetti.count).reversed() {
+                confetti[i].y += confetti[i].speed
+                confetti[i].x += CGFloat(sin(timePhase * 3 + Double(i) * 2)) * 0.5
+                if confetti[i].y > height + 10 {
+                    confetti.remove(at: i)
+                }
+            }
+
+            // Bird flight
+            if birdVisible && !birdLanded {
+                birdX += 0.002
+                if birdX > 0.5 {
+                    // Land on grass
+                    birdLanded = true
                 }
             }
 
@@ -615,6 +843,61 @@ struct TurtleSceneView: View {
                 raindrops.removeAll()
             }
 
+            // Seasonal particle spawning
+            if currentSeason != .summer && seasonalParticles.count < 8 && Int.random(in: 0 ..< 6) == 0 {
+                seasonalParticles.append((
+                    x: CGFloat.random(in: 0 ... max(width, 1)),
+                    y: -5,
+                    drift: CGFloat.random(in: -0.3 ... 0.3),
+                    speed: CGFloat.random(in: 0.3 ... 0.8)
+                ))
+            }
+
+            // Bird visitor (random, about every 2 minutes)
+            if !birdVisible && Int.random(in: 0 ..< 240) == 0 {
+                birdX = -0.5
+                birdVisible = true
+                birdLanded = false
+                // Bird flies away after 10-15 seconds
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(Double.random(in: 10 ... 15)))
+                    birdVisible = false
+                    birdLanded = false
+                }
+            }
+
+            // Worm pokes out occasionally
+            if !wormVisible && Int.random(in: 0 ..< 120) == 0 {
+                wormVisible = true
+                wormY = 0
+                Task { @MainActor in
+                    // Poke up
+                    for _ in 0 ..< 5 {
+                        withAnimation(.easeOut(duration: 0.2)) { wormY -= 2 }
+                        try? await Task.sleep(for: .milliseconds(200))
+                    }
+                    // Pause
+                    try? await Task.sleep(for: .seconds(Double.random(in: 2 ... 4)))
+                    // Retract
+                    for _ in 0 ..< 5 {
+                        withAnimation(.easeIn(duration: 0.15)) { wormY += 2 }
+                        try? await Task.sleep(for: .milliseconds(150))
+                    }
+                    wormVisible = false
+                }
+            }
+
+            // Error streak → hide in shell
+            if emotion == .sob && errorStreak >= 3 && !hiddenInShell {
+                withAnimation(.easeIn(duration: 0.3)) { hiddenInShell = true }
+                isWalking = false
+            }
+            if emotion != .sob && hiddenInShell {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { hiddenInShell = false }
+                isWalking = true
+                errorStreak = 0
+            }
+
             // Look up at user occasionally (breaks fourth wall)
             if !isSleeping && !isEating && !lookingUp && Int.random(in: 0 ..< 40) == 0 {
                 lookingUp = true
@@ -666,16 +949,47 @@ struct TurtleSceneView: View {
         .onChange(of: isProcessing) { wasProcessing, nowProcessing in
             // Wake up when processing starts
             if nowProcessing && isSleeping {
+                // First prompt after sleep = stretch wake-up
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { isSleeping = false }
+                // Yawn/stretch: head extends way out then back
+                Task { @MainActor in
+                    withAnimation(.easeOut(duration: 0.4)) { headExtension = 6 }
+                    try? await Task.sleep(for: .milliseconds(600))
+                    withAnimation(.easeInOut(duration: 0.3)) { headExtension = 0 }
+                }
             }
             lastActivityTime = Date()
+
+            if nowProcessing {
+                promptCount += 1
+                errorStreak = 0
+
+                // Confetti at milestones (every 50 prompts)
+                if promptCount % 50 == 0 {
+                    for _ in 0 ..< 20 {
+                        confetti.append((
+                            x: CGFloat.random(in: 0 ... max(width, 1)),
+                            y: -CGFloat.random(in: 0 ... 10),
+                            color: Int.random(in: 0 ..< 6),
+                            speed: CGFloat.random(in: 0.5 ... 1.5)
+                        ))
+                    }
+                }
+            }
 
             // Spawn a new flower if there isn't one
             if nowProcessing && !flowerVisible {
                 spawnFlower()
             }
         }
-        .onChange(of: emotion) { _, newEmotion in
+        .onChange(of: emotion) { oldEmotion, newEmotion in
+            // Track error streaks
+            if newEmotion == .sad || newEmotion == .sob {
+                errorStreak += 1
+            } else if newEmotion == .happy || newEmotion == .neutral {
+                errorStreak = 0
+            }
+
             // Happy bounce reaction
             if newEmotion == .happy {
                 withAnimation(.spring(response: 0.2, dampingFraction: 0.4)) {
