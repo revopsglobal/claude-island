@@ -74,26 +74,25 @@ struct NotchView: View {
     }
 
     /// Extra width for expanding activities (like Dynamic Island)
-    /// Wider than stock to give the turtle room to roam
+    /// Symmetric expansion on both sides for the turtle's grass island
     private var expansionWidth: CGFloat {
-        let permissionIndicatorWidth: CGFloat = hasPendingPermission ? 18 : 0
-        let turtleSceneWidth: CGFloat = 80  // wide enough for the turtle to feel spacious
+        let perSide: CGFloat = 50  // 50px expansion on each side of notch
 
         if activityCoordinator.expandingActivity.show {
             switch activityCoordinator.expandingActivity.type {
             case .claude:
-                return turtleSceneWidth + sideWidth + permissionIndicatorWidth
+                return perSide * 2
             case .none:
                 break
             }
         }
 
         if hasPendingPermission {
-            return turtleSceneWidth + sideWidth + permissionIndicatorWidth
+            return perSide * 2
         }
 
         if hasWaitingForInput {
-            return turtleSceneWidth + sideWidth
+            return perSide * 2
         }
 
         return 0
@@ -250,59 +249,67 @@ struct NotchView: View {
 
     // MARK: - Header Row (persists across states)
 
+    /// Full width of the closed expanded area (both sides + notch)
+    private var closedExpandedWidth: CGFloat {
+        closedNotchSize.width + expansionWidth
+    }
+
     @ViewBuilder
     private var headerRow: some View {
-        HStack(spacing: 0) {
-            // Left side - turtle scene + optional permission indicator
-            if showClosedActivity {
-                HStack(spacing: 4) {
-                    TurtleSceneView(
-                        emotion: primaryEmotion,
-                        isProcessing: isProcessing,
-                        width: viewModel.status == .opened ? sideWidth + 8 : 80,
-                        height: closedNotchSize.height
-                    )
-                    .matchedGeometryEffect(id: "turtle", in: activityNamespace, isSource: showClosedActivity)
+        if viewModel.status == .opened {
+            // Opened state: normal HStack layout
+            HStack(spacing: 0) {
+                if showClosedActivity {
+                    ClaudeTurtleIcon(size: 14, animateLegs: isProcessing, emotion: primaryEmotion)
+                        .matchedGeometryEffect(id: "turtle", in: activityNamespace, isSource: showClosedActivity)
+                        .padding(.leading, 8)
+                }
+                openedHeaderContent
+            }
+            .frame(height: closedNotchSize.height)
+        } else if showClosedActivity {
+            // Closed with activity: turtle scene spans full width (both sides of notch)
+            ZStack {
+                // Grass island background spanning the entire expanded area
+                TurtleSceneView(
+                    emotion: primaryEmotion,
+                    isProcessing: isProcessing,
+                    width: closedExpandedWidth,
+                    height: closedNotchSize.height
+                )
+                .matchedGeometryEffect(id: "turtle", in: activityNamespace, isSource: true)
 
+                // Overlay: permission indicator (left) or spinner/checkmark (right)
+                HStack {
                     if hasPendingPermission {
                         PermissionIndicatorIcon(size: 14, color: Color(red: 0.85, green: 0.47, blue: 0.34))
-                            .matchedGeometryEffect(id: "status-indicator", in: activityNamespace, isSource: showClosedActivity)
+                            .matchedGeometryEffect(id: "status-indicator", in: activityNamespace, isSource: true)
+                            .padding(.leading, 6)
+                    }
+
+                    Spacer()
+
+                    if isProcessing || hasPendingPermission {
+                        ProcessingSpinner()
+                            .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: true)
+                            .padding(.trailing, 6)
+                    } else if hasWaitingForInput {
+                        ReadyForInputIndicatorIcon(size: 14, color: TerminalColors.green)
+                            .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: true)
+                            .padding(.trailing, 6)
                     }
                 }
-                .padding(.leading, viewModel.status == .opened ? 8 : 0)
             }
-
-            // Center content
-            if viewModel.status == .opened {
-                // Opened: show header content
-                openedHeaderContent
-            } else if !showClosedActivity {
-                // Closed without activity: empty space
+            .frame(width: closedExpandedWidth, height: closedNotchSize.height)
+        } else {
+            // Closed without activity: empty
+            HStack(spacing: 0) {
                 Rectangle()
                     .fill(.clear)
                     .frame(width: closedNotchSize.width - 20)
-            } else {
-                // Closed with activity: black spacer (with optional bounce)
-                Rectangle()
-                    .fill(.black)
-                    .frame(width: closedNotchSize.width - cornerRadiusInsets.closed.top + (isBouncing ? 16 : 0))
             }
-
-            // Right side - spinner when processing/pending, checkmark when waiting for input
-            if showClosedActivity {
-                if isProcessing || hasPendingPermission {
-                    ProcessingSpinner()
-                        .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: showClosedActivity)
-                        .frame(width: viewModel.status == .opened ? 20 : sideWidth)
-                } else if hasWaitingForInput {
-                    // Checkmark for waiting-for-input on the right side
-                    ReadyForInputIndicatorIcon(size: 14, color: TerminalColors.green)
-                        .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: showClosedActivity)
-                        .frame(width: viewModel.status == .opened ? 20 : sideWidth)
-                }
-            }
+            .frame(height: closedNotchSize.height)
         }
-        .frame(height: closedNotchSize.height)
     }
 
     private var sideWidth: CGFloat {
