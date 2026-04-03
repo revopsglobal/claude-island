@@ -789,7 +789,7 @@ struct TurtleSceneView: View {
                 .scaleEffect(s.flowerScale)
                 .offset(
                     x: s.flowerX * width,
-                    y: -(height * 0.15)
+                    y: -(height * 0.22)
                 )
                 .transition(.scale.combined(with: .opacity))
                 .animation(.easeInOut(duration: 0.2), value: s.petalCount)
@@ -984,9 +984,7 @@ struct TurtleSceneView: View {
                     s.walkDirection = dir
 
                     // Can still eat flower on the way to rest
-                    let distToFlower = s.flowerX - s.walkX
-                    let approaching = dir > 0 ? (distToFlower > 0 && distToFlower < 0.12) : (distToFlower < 0 && distToFlower > -0.12)
-                    if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && approaching {
+                    if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && abs(s.walkX - s.flowerX) < 0.04 {
                         eatFlower()
                     }
                     return
@@ -1040,11 +1038,9 @@ struct TurtleSceneView: View {
                     s.walkX += s.walkDirection * speed * 2  // 3x speed through center
                 }
 
-                // Check if turtle is near the flower (stop short so head reaches it, not body overlap)
-                let eatDistance: CGFloat = 0.12
-                let distToFlower = s.flowerX - s.walkX  // positive = flower is to the right
-                let closeEnough = s.walkDirection > 0 ? (distToFlower > 0 && distToFlower < eatDistance) : (distToFlower < 0 && distToFlower > -eatDistance)
-                if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && closeEnough {
+                // Check if turtle is near the flower (stop just before it)
+                let eatGap: CGFloat = 0.04  // small gap so head reaches flower
+                if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && abs(s.walkX - s.flowerX) < eatGap {
                     eatFlower()
                 }
             }
