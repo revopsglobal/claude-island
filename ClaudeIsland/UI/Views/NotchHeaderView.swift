@@ -966,6 +966,13 @@ struct TurtleSceneView: View {
                     s.walkX += dir * 0.003
                     s.facingRight = dir > 0
                     s.walkDirection = dir
+
+                    // Can still eat flower on the way to rest
+                    let distToFlower = s.flowerX - s.walkX
+                    let approaching = dir > 0 ? (distToFlower > 0 && distToFlower < 0.12) : (distToFlower < 0 && distToFlower > -0.12)
+                    if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && approaching {
+                        eatFlower()
+                    }
                     return
                 }
                 // Arrived at resting spot -- face away from notch
