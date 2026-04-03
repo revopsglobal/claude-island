@@ -174,6 +174,13 @@ struct TurtleSceneView: View {
     @State private var swayAngle: Double = 0
     @State private var trembleX: Double = 0
 
+    // Walking state
+    @State private var walkX: CGFloat = -0.35       // normalized position (-0.5 to 0.5), start on left edge
+    @State private var walkDirection: CGFloat = 1    // 1 = right, -1 = left
+    @State private var isWalking: Bool = true
+    @State private var walkPauseUntil: Date = .distantPast
+    @State private var facingRight: Bool = true
+
     // Life state
     @State private var isBlinking: Bool = false
     @State private var headExtension: CGFloat = 0
@@ -258,24 +265,24 @@ struct TurtleSceneView: View {
                 }
             }
 
-            // Turtle
+            // Turtle (walks across scene, flips direction)
             ClaudeTurtleIcon(
                 size: min(height * 0.55, 22),
-                animateLegs: isProcessing && !isSleeping,
+                animateLegs: (isWalking && !isSleeping) || (isProcessing && !isSleeping),
                 emotion: emotion,
                 isBlinking: isBlinking,
                 headExtension: headExtension,
                 isSleeping: isSleeping
             )
-            .scaleEffect(breathScale, anchor: .bottom)
+            .scaleEffect(x: facingRight ? breathScale : -breathScale, y: breathScale, anchor: .bottom)
             .offset(
-                x: (emotion == .sob ? CGFloat(trembleX) : 0) + tailWag,
+                x: walkX * width + (emotion == .sob ? CGFloat(trembleX) : 0) + tailWag,
                 y: -(height * 0.35) + CGFloat(sin(bobPhase) * Double(bobAmplitude))
             )
             .rotationEffect(.degrees(swayAngle * swayDeg), anchor: .bottom)
         }
         .frame(width: width, height: height)
-        .onReceive(motionTimer) { _ in
+        .onReceive(motionTimer) { now in
             // Core motion
             bobPhase += (2.0 * .pi) / (bobSpeed * 30.0)
             swayAngle = sin(bobPhase * 0.7)
@@ -284,6 +291,52 @@ struct TurtleSceneView: View {
             // Breathing: subtle shell pulse
             let breathCycle = sin(bobPhase * 0.4) * 0.015
             breathScale = 1.0 + CGFloat(breathCycle)
+
+            // Walking logic
+            guard !isSleeping else { return }
+            guard now > walkPauseUntil else { return }
+
+            if isWalking {
+                // Walk speed: slower when idle, faster when processing
+                let speed: CGFloat = isProcessing ? 0.0018 : 0.0008
+                walkX += walkDirection * speed
+
+                // Edge boundaries (where the visible areas are)
+                let leftEdge: CGFloat = -0.42
+                let rightEdge: CGFloat = 0.42
+
+                // Hit an edge: pause, then turn around
+                if walkX >= rightEdge {
+                    walkX = rightEdge
+                    isWalking = false
+                    // Pause at edge 2-5 seconds (longer on edges = more visible time)
+                    let pause = Double.random(in: 2.0 ... 5.0)
+                    walkPauseUntil = now.addingTimeInterval(pause)
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(pause))
+                        walkDirection = -1
+                        facingRight = false
+                        isWalking = true
+                    }
+                } else if walkX <= leftEdge {
+                    walkX = leftEdge
+                    isWalking = false
+                    let pause = Double.random(in: 2.0 ... 5.0)
+                    walkPauseUntil = now.addingTimeInterval(pause)
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(pause))
+                        walkDirection = 1
+                        facingRight = true
+                        isWalking = true
+                    }
+                }
+
+                // When crossing through center (behind notch), speed up
+                let centerZone: CGFloat = 0.15
+                if abs(walkX) < centerZone {
+                    walkX += walkDirection * speed * 2  // 3x speed through center
+                }
+            }
         }
         .onReceive(lifeTimer) { now in
             // Track activity
