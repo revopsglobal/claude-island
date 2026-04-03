@@ -75,23 +75,12 @@ struct NotchView: View {
 
     /// Extra width for expanding activities (like Dynamic Island)
     /// Symmetric expansion on both sides for the turtle's grass island
+    /// Always expanded when there are sessions so the turtle has a home
     private var expansionWidth: CGFloat {
-        let perSide: CGFloat = 65  // 65px expansion on each side of notch
+        let perSide: CGFloat = 65
 
-        if activityCoordinator.expandingActivity.show {
-            switch activityCoordinator.expandingActivity.type {
-            case .claude:
-                return perSide * 2
-            case .none:
-                break
-            }
-        }
-
-        if hasPendingPermission {
-            return perSide * 2
-        }
-
-        if hasWaitingForInput {
+        // Always show the scene when there are active sessions
+        if !sessionMonitor.instances.isEmpty {
             return perSide * 2
         }
 
@@ -219,9 +208,10 @@ struct NotchView: View {
         activityCoordinator.expandingActivity.show && activityCoordinator.expandingActivity.type == .claude
     }
 
-    /// Whether to show the expanded closed state (processing, pending permission, or waiting for input)
+    /// Whether to show the turtle scene in closed state
+    /// Always show when there are active sessions (turtle sleeps when idle)
     private var showClosedActivity: Bool {
-        isProcessing || hasPendingPermission || hasWaitingForInput
+        !sessionMonitor.instances.isEmpty
     }
 
     @ViewBuilder
