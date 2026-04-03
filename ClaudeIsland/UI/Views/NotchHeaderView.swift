@@ -381,8 +381,8 @@ struct TurtleSceneView: View {
                 walkX += walkDirection * speed
 
                 // Edge boundaries (where the visible areas are)
-                let leftEdge: CGFloat = -0.42
-                let rightEdge: CGFloat = 0.42
+                let leftEdge: CGFloat = -0.47
+                let rightEdge: CGFloat = 0.47
 
                 // Hit an edge: pause, then turn around
                 if walkX >= rightEdge {
