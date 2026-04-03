@@ -290,6 +290,19 @@ class TurtleSceneState: ObservableObject {
     @Published var tailWag: CGFloat = 0
     @Published var lookingUp: Bool = false
 
+    // New features
+    @Published var shootingStars: [(x: CGFloat, y: CGFloat, dx: CGFloat, life: Double)] = []
+    @Published var showRainbow: Bool = false
+    @Published var rainbowOpacity: Double = 0
+    @Published var campfireFlicker: Double = 0
+    @Published var mushrooms: [(x: CGFloat, size: CGFloat)] = []
+    @Published var footprints: [(x: CGFloat, opacity: Double)] = []
+    @Published var snailX: CGFloat = -0.5
+    @Published var snailVisible: Bool = false
+    @Published var sessionStartTime: Date = Date()
+    @Published var musicNotes: [(x: CGFloat, y: CGFloat, opacity: Double)] = []
+    @Published var cursorNearNotch: Bool = false
+
     static let shared = TurtleSceneState()
 }
 
@@ -593,6 +606,130 @@ struct TurtleSceneView: View {
                 .allowsHitTesting(false)
             }
 
+            // Shooting stars (night only)
+            ForEach(0 ..< s.shootingStars.count, id: \.self) { i in
+                let star = s.shootingStars[i]
+                Canvas { context, _ in
+                    let trail = Path { p in
+                        p.move(to: CGPoint(x: 0, y: 0))
+                        p.addLine(to: CGPoint(x: -8, y: 2))
+                    }
+                    context.stroke(trail, with: .color(.white.opacity(star.life)), lineWidth: 1.5)
+                    let dot = Path { p in p.addEllipse(in: CGRect(x: -1, y: -1, width: 2, height: 2)) }
+                    context.fill(dot, with: .color(.white.opacity(star.life)))
+                }
+                .frame(width: 12, height: 6)
+                .offset(x: star.x - width / 2, y: star.y)
+                .allowsHitTesting(false)
+            }
+
+            // Rainbow (after rain clears)
+            if s.showRainbow {
+                Canvas { context, canvasSize in
+                    let w = canvasSize.width
+                    let h = canvasSize.height
+                    let rainbowColors: [Color] = [.red, .orange, .yellow, .green, .blue, .purple]
+                    for (i, color) in rainbowColors.enumerated() {
+                        let radius = w * 0.4 - CGFloat(i) * 2
+                        let arc = Path { p in
+                            p.addArc(center: CGPoint(x: w / 2, y: h), radius: radius, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+                        }
+                        context.stroke(arc, with: .color(color.opacity(s.rainbowOpacity * 0.5)), lineWidth: 1.5)
+                    }
+                }
+                .frame(width: width, height: height)
+                .allowsHitTesting(false)
+            }
+
+            // Campfire (night, idle)
+            if isNighttime && !isProcessing {
+                Canvas { context, _ in
+                    // Logs
+                    let log1 = Path { p in p.addRect(CGRect(x: -4, y: 2, width: 8, height: 2)) }
+                    let log2 = Path { p in p.addRect(CGRect(x: -3, y: 0, width: 6, height: 2)) }
+                    context.fill(log1, with: .color(Color(red: 0.4, green: 0.25, blue: 0.1)))
+                    context.fill(log2, with: .color(Color(red: 0.35, green: 0.2, blue: 0.08)))
+                    // Flame
+                    let flameH = 5 + s.campfireFlicker * 2
+                    let flame = Path { p in
+                        p.addEllipse(in: CGRect(x: -2, y: -CGFloat(flameH), width: 4, height: CGFloat(flameH)))
+                    }
+                    context.fill(flame, with: .color(Color(red: 1.0, green: 0.6, blue: 0.1).opacity(0.8)))
+                    let innerFlame = Path { p in
+                        p.addEllipse(in: CGRect(x: -1, y: -CGFloat(flameH * 0.6), width: 2, height: CGFloat(flameH * 0.6)))
+                    }
+                    context.fill(innerFlame, with: .color(Color(red: 1.0, green: 0.9, blue: 0.3).opacity(0.9)))
+                }
+                .frame(width: 12, height: 14)
+                .offset(x: 0, y: -(height * 0.2))
+                .allowsHitTesting(false)
+            }
+
+            // Mushrooms (grow over time on grass)
+            ForEach(0 ..< s.mushrooms.count, id: \.self) { i in
+                let m = s.mushrooms[i]
+                Canvas { context, _ in
+                    let sz = m.size
+                    // Stem
+                    let stem = Path { p in p.addRect(CGRect(x: -1 * sz, y: 0, width: 2 * sz, height: 4 * sz)) }
+                    context.fill(stem, with: .color(Color(red: 0.9, green: 0.85, blue: 0.7)))
+                    // Cap
+                    let cap = Path { p in p.addEllipse(in: CGRect(x: -2.5 * sz, y: -2 * sz, width: 5 * sz, height: 3 * sz)) }
+                    context.fill(cap, with: .color(Color(red: 0.8, green: 0.2, blue: 0.15)))
+                    // Spots
+                    let spot = Path { p in p.addEllipse(in: CGRect(x: -0.5 * sz, y: -1.5 * sz, width: 1.5 * sz, height: 1 * sz)) }
+                    context.fill(spot, with: .color(.white.opacity(0.8)))
+                }
+                .frame(width: 10, height: 10)
+                .offset(x: m.x * width - width / 2, y: -(height * 0.1))
+                .allowsHitTesting(false)
+            }
+
+            // Footprints (fade behind walking turtle)
+            ForEach(0 ..< s.footprints.count, id: \.self) { i in
+                let fp = s.footprints[i]
+                Circle()
+                    .fill(Color(red: 0.15, green: 0.25, blue: 0.12).opacity(fp.opacity))
+                    .frame(width: 2, height: 2)
+                    .offset(x: fp.x * width, y: -(height * 0.05))
+                    .allowsHitTesting(false)
+            }
+
+            // Snail companion (appears during long sessions)
+            if s.snailVisible {
+                Canvas { context, _ in
+                    let shellC = Color(red: 0.7, green: 0.5, blue: 0.3)
+                    let bodyC = Color(red: 0.6, green: 0.55, blue: 0.4)
+                    // Body
+                    let body = Path { p in p.addEllipse(in: CGRect(x: -4, y: 0, width: 8, height: 3)) }
+                    context.fill(body, with: .color(bodyC))
+                    // Shell
+                    let shell = Path { p in p.addEllipse(in: CGRect(x: -2, y: -4, width: 6, height: 6)) }
+                    context.fill(shell, with: .color(shellC))
+                    // Shell spiral
+                    let spiral = Path { p in p.addEllipse(in: CGRect(x: 0, y: -2.5, width: 3, height: 3)) }
+                    context.fill(spiral, with: .color(shellC.opacity(0.6)))
+                    // Eye stalks
+                    let stalk = Path { p in p.addRect(CGRect(x: -4, y: -3, width: 1, height: 3)) }
+                    context.fill(stalk, with: .color(bodyC))
+                    let eye = Path { p in p.addEllipse(in: CGRect(x: -4.5, y: -4, width: 2, height: 2)) }
+                    context.fill(eye, with: .color(.black))
+                }
+                .frame(width: 14, height: 10)
+                .offset(x: s.snailX * width, y: -(height * 0.15))
+                .allowsHitTesting(false)
+            }
+
+            // Music notes (when Luminbeat session active)
+            ForEach(0 ..< s.musicNotes.count, id: \.self) { i in
+                let note = s.musicNotes[i]
+                Text("\u{266A}")
+                    .font(.system(size: 7))
+                    .foregroundColor(Color(red: 0.6, green: 0.4, blue: 0.9).opacity(note.opacity))
+                    .offset(x: note.x * width - width / 2, y: note.y * height - height)
+                    .allowsHitTesting(false)
+            }
+
     }
 
     @ViewBuilder
@@ -765,9 +902,52 @@ struct TurtleSceneView: View {
             if s.birdVisible && !s.birdLanded {
                 s.birdX += 0.002
                 if s.birdX > 0.5 {
-                    // Land on grass
                     s.birdLanded = true
                 }
+            }
+
+            // Shooting stars (move and fade)
+            for i in (0 ..< s.shootingStars.count).reversed() {
+                s.shootingStars[i].x += s.shootingStars[i].dx
+                s.shootingStars[i].y += 0.5
+                s.shootingStars[i].life -= 0.02
+                if s.shootingStars[i].life <= 0 {
+                    s.shootingStars.remove(at: i)
+                }
+            }
+
+            // Campfire flicker
+            if isNighttime {
+                s.campfireFlicker = sin(s.timePhase * 8) * 0.5 + Double.random(in: -0.2 ... 0.2)
+            }
+
+            // Footprints (fade)
+            for i in (0 ..< s.footprints.count).reversed() {
+                s.footprints[i].opacity -= 0.003
+                if s.footprints[i].opacity <= 0 {
+                    s.footprints.remove(at: i)
+                }
+            }
+
+            // Snail creep (very slow)
+            if s.snailVisible {
+                s.snailX += 0.0002
+                if s.snailX > 0.5 { s.snailX = -0.5 }
+            }
+
+            // Music notes (float up and fade)
+            for i in (0 ..< s.musicNotes.count).reversed() {
+                s.musicNotes[i].y -= 0.008
+                s.musicNotes[i].opacity -= 0.01
+                if s.musicNotes[i].opacity <= 0 {
+                    s.musicNotes.remove(at: i)
+                }
+            }
+
+            // Rainbow fade
+            if s.showRainbow {
+                s.rainbowOpacity = max(0, s.rainbowOpacity - 0.002)
+                if s.rainbowOpacity <= 0 { s.showRainbow = false }
             }
 
             // Walking logic -- only walks when Claude is processing
@@ -871,6 +1051,45 @@ struct TurtleSceneView: View {
                 }
             } else if emotion != .sad && emotion != .sob && !s.raindrops.isEmpty {
                 s.raindrops.removeAll()
+            }
+
+            // Shooting stars at night (random, rare)
+            if isNighttime && s.shootingStars.count < 2 && Int.random(in: 0 ..< 60) == 0 {
+                s.shootingStars.append((
+                    x: CGFloat.random(in: 0 ... max(width, 1)),
+                    y: CGFloat.random(in: 0 ... 8),
+                    dx: CGFloat.random(in: 2 ... 4),
+                    life: 1.0
+                ))
+            }
+
+            // Mushroom growth (slowly appear over time, max 3)
+            if s.mushrooms.count < 3 && Int.random(in: 0 ..< 300) == 0 {
+                let newMushroom = (x: CGFloat.random(in: -0.4 ... 0.4), size: CGFloat(0.3))
+                s.mushrooms.append(newMushroom)
+            }
+            // Grow existing mushrooms
+            for i in 0 ..< s.mushrooms.count {
+                if s.mushrooms[i].size < 1.0 {
+                    s.mushrooms[i].size = min(1.0, s.mushrooms[i].size + 0.005)
+                }
+            }
+
+            // Snail appears after 10 minutes of session time
+            if !s.snailVisible && Date().timeIntervalSince(s.sessionStartTime) > 600 {
+                s.snailVisible = true
+                s.snailX = -0.5
+            }
+
+            // Music notes when a session with "luminbeat" in the name is active
+            // (Detected by checking if any processing session has luminbeat in the project name)
+            // For now, just check periodically if there's a luminbeat-looking flower eating happening
+            // This is a placeholder -- actual session name detection would need to come from NotchView
+
+            // Footprints while walking
+            if s.isWalking && isProcessing && Int.random(in: 0 ..< 4) == 0 {
+                s.footprints.append((x: s.walkX, opacity: 0.4))
+                if s.footprints.count > 20 { s.footprints.removeFirst() }
             }
 
             // Seasonal particle spawning
@@ -1018,6 +1237,12 @@ struct TurtleSceneView: View {
                 s.errorStreak += 1
             } else if newEmotion == .happy || newEmotion == .neutral {
                 s.errorStreak = 0
+            }
+
+            // Rainbow after rain clears (sad/sob -> happy)
+            if (oldEmotion == .sad || oldEmotion == .sob) && newEmotion == .happy {
+                s.showRainbow = true
+                s.rainbowOpacity = 1.0
             }
 
             // Happy bounce reaction
