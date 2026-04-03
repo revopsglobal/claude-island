@@ -246,14 +246,38 @@ struct NotchView: View {
 
     @ViewBuilder
     private var headerRow: some View {
-        if viewModel.status == .opened {
-            // Opened state: normal HStack layout
-            HStack(spacing: 0) {
-                if showClosedActivity {
-                    ClaudeTurtleIcon(size: 14, animateLegs: isProcessing, emotion: primaryEmotion)
-                        .matchedGeometryEffect(id: "turtle", in: activityNamespace, isSource: showClosedActivity)
-                        .padding(.leading, 8)
+        if viewModel.status == .opened && showClosedActivity {
+            // Opened state: turtle scene persists as header backdrop
+            ZStack {
+                TurtleSceneView(
+                    emotion: primaryEmotion,
+                    isProcessing: isProcessing,
+                    width: notchSize.width,
+                    height: closedNotchSize.height
+                )
+                .matchedGeometryEffect(id: "turtle", in: activityNamespace, isSource: true)
+
+                // Menu button overlay on top right
+                HStack {
+                    Spacer()
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            viewModel.toggleMenu()
+                        }
+                    } label: {
+                        Image(systemName: viewModel.contentType == .menu ? "xmark" : "line.3.horizontal")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
                 }
+                .padding(.trailing, 8)
+            }
+            .frame(height: closedNotchSize.height)
+        } else if viewModel.status == .opened {
+            // Opened without sessions: normal header
+            HStack(spacing: 0) {
                 openedHeaderContent
             }
             .frame(height: closedNotchSize.height)
