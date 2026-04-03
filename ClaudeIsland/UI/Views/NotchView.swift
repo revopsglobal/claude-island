@@ -279,7 +279,8 @@ struct NotchView: View {
                 )
                 .matchedGeometryEffect(id: "turtle", in: activityNamespace, isSource: true)
 
-                // Overlay: permission indicator (left) or spinner/checkmark (right)
+                // Overlay: permission indicator (left) or checkmark (right)
+                // Processing is indicated by the flower in the scene (turtle eats it)
                 HStack {
                     if hasPendingPermission {
                         PermissionIndicatorIcon(size: 14, color: Color(red: 0.85, green: 0.47, blue: 0.34))
@@ -289,7 +290,7 @@ struct NotchView: View {
 
                     Spacer()
 
-                    if isProcessing || hasPendingPermission {
+                    if hasPendingPermission {
                         ProcessingSpinner()
                             .matchedGeometryEffect(id: "spinner", in: activityNamespace, isSource: true)
                             .padding(.trailing, 6)

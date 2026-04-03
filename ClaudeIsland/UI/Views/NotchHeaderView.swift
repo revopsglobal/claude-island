@@ -181,6 +181,12 @@ struct TurtleSceneView: View {
     @State private var walkPauseUntil: Date = .distantPast
     @State private var facingRight: Bool = true
 
+    // Flower state
+    @State private var flowerX: CGFloat = 0.35          // where the flower is (normalized)
+    @State private var flowerVisible: Bool = false
+    @State private var flowerScale: CGFloat = 0
+    @State private var flowerEaten: Bool = false
+
     // Life state
     @State private var isBlinking: Bool = false
     @State private var headExtension: CGFloat = 0
@@ -265,6 +271,48 @@ struct TurtleSceneView: View {
                 }
             }
 
+            // Flower (appears when processing, turtle walks to eat it)
+            if flowerVisible {
+                Canvas { context, canvasSize in
+                    let s = min(height * 0.3, 12) / 12.0
+                    let cx = canvasSize.width / 2
+                    let cy = canvasSize.height / 2
+
+                    func petal(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, color: Color) {
+                        let r = CGRect(x: (cx + x) * 1, y: (cy + y) * 1, width: w * s, height: h * s)
+                        context.fill(Path(r), with: .color(color))
+                    }
+
+                    // Stem
+                    let stemRect = CGRect(x: cx - 1 * s, y: cy + 2 * s, width: 2 * s, height: 8 * s)
+                    context.fill(Path(stemRect), with: .color(Color(red: 0.3, green: 0.6, blue: 0.2)))
+
+                    // Petals (simple pixel flower)
+                    let petalColor = Color(red: 1.0, green: 0.45, blue: 0.5)
+                    let petalRects: [CGRect] = [
+                        CGRect(x: cx - 1 * s, y: cy - 5 * s, width: 3 * s, height: 3 * s), // top
+                        CGRect(x: cx + 2 * s, y: cy - 2 * s, width: 3 * s, height: 3 * s), // right
+                        CGRect(x: cx - 4 * s, y: cy - 2 * s, width: 3 * s, height: 3 * s), // left
+                        CGRect(x: cx + 1 * s, y: cy + 1 * s, width: 3 * s, height: 3 * s), // bottom-right
+                        CGRect(x: cx - 3 * s, y: cy + 1 * s, width: 3 * s, height: 3 * s), // bottom-left
+                    ]
+                    for r in petalRects {
+                        context.fill(Path(r), with: .color(petalColor))
+                    }
+
+                    // Center
+                    let centerRect = CGRect(x: cx - 1.5 * s, y: cy - 1.5 * s, width: 4 * s, height: 4 * s)
+                    context.fill(Path(centerRect), with: .color(Color(red: 1.0, green: 0.85, blue: 0.2)))
+                }
+                .frame(width: 20, height: 20)
+                .scaleEffect(flowerScale)
+                .offset(
+                    x: flowerX * width,
+                    y: -(height * 0.15)
+                )
+                .transition(.scale.combined(with: .opacity))
+            }
+
             // Turtle (walks across scene, flips direction)
             ClaudeTurtleIcon(
                 size: min(height * 0.75, 28),
@@ -337,6 +385,11 @@ struct TurtleSceneView: View {
                 if abs(walkX) < centerZone {
                     walkX += walkDirection * speed * 2  // 3x speed through center
                 }
+
+                // Check if turtle reached the flower
+                if flowerVisible && !flowerEaten && abs(walkX - flowerX) < 0.05 {
+                    eatFlower()
+                }
             }
         }
         .onReceive(lifeTimer) { now in
@@ -391,6 +444,22 @@ struct TurtleSceneView: View {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { isSleeping = false }
             }
             lastActivityTime = Date()
+
+            // Spawn a flower when processing starts
+            if nowProcessing && !flowerVisible {
+                spawnFlower()
+            }
+            // Remove flower when processing stops
+            if !nowProcessing && flowerVisible {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    flowerScale = 0
+                }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    flowerVisible = false
+                    flowerEaten = false
+                }
+            }
         }
         .onChange(of: emotion) { _, newEmotion in
             // Happy bounce reaction
@@ -409,6 +478,57 @@ struct TurtleSceneView: View {
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(1200))
                     withAnimation(.easeInOut(duration: 0.4)) { headExtension = 0 }
+                }
+            }
+        }
+    }
+
+    // MARK: - Flower Logic
+
+    private func spawnFlower() {
+        // Place flower on opposite side from turtle, on a visible edge
+        let side: CGFloat = walkX > 0 ? -1 : 1
+        flowerX = side * CGFloat.random(in: 0.28 ... 0.42)
+        flowerEaten = false
+        flowerVisible = true
+        flowerScale = 0
+
+        // Grow animation
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+            flowerScale = 1.0
+        }
+
+        // Point turtle toward flower
+        walkDirection = flowerX > walkX ? 1 : -1
+        facingRight = walkDirection > 0
+        isWalking = true
+        walkPauseUntil = .distantPast
+    }
+
+    private func eatFlower() {
+        guard !flowerEaten else { return }
+        flowerEaten = true
+
+        // Head lunge forward (eating)
+        withAnimation(.spring(response: 0.15, dampingFraction: 0.5)) {
+            headExtension = 5
+        }
+
+        // Flower shrinks as eaten
+        withAnimation(.easeIn(duration: 0.3)) {
+            flowerScale = 0
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            withAnimation(.easeOut(duration: 0.2)) { headExtension = 0 }
+            flowerVisible = false
+
+            // If still processing, spawn another flower after a pause
+            if isProcessing {
+                try? await Task.sleep(for: .seconds(Double.random(in: 1.5 ... 3.0)))
+                if isProcessing {
+                    spawnFlower()
                 }
             }
         }
