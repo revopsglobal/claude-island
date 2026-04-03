@@ -984,7 +984,7 @@ struct TurtleSceneView: View {
                     s.walkDirection = dir
 
                     // Can still eat flower on the way to rest
-                    if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && abs(s.walkX - s.flowerX) < 0.07 {
+                    if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && abs(s.walkX - s.flowerX) < 0.02 {
                         eatFlower()
                     }
                     return
