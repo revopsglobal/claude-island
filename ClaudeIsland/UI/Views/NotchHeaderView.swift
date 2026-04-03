@@ -317,6 +317,14 @@ class TurtleSceneState: ObservableObject {
     // Puddles (after rain)
     @Published var puddles: [(x: CGFloat, opacity: Double)] = []
 
+    // Emotion-driven environment
+    @Published var sparkles: [(x: CGFloat, y: CGFloat, opacity: Double, size: CGFloat)] = []
+    @Published var steamPuffs: [(x: CGFloat, y: CGFloat, opacity: Double, size: CGFloat)] = []
+    @Published var cloudOpacity: Double = 0  // dark overlay for sad/sob sky
+    @Published var grassDimFactor: Double = 1.0  // 1.0 = normal, 0.5 = dimmed for anger
+    @Published var flowerBloomScale: CGFloat = 1.0  // grows when happy
+    @Published var teardrops: [(x: CGFloat, y: CGFloat, opacity: Double)] = []  // visible tears from Sheldon
+
     static let shared = TurtleSceneState()
 }
 
@@ -379,21 +387,28 @@ struct TurtleSceneView: View {
 
 
 
-    // Grass colors adjusted for time of day
+    // Grass colors adjusted for time of day and emotion
     private var grassDark: Color {
-        Color(red: 0.18 * daylight, green: 0.32 * daylight, blue: 0.15 * daylight)
+        let dim = s.grassDimFactor
+        return Color(red: 0.18 * daylight * dim, green: 0.32 * daylight * dim, blue: 0.15 * daylight * dim)
     }
     private var grassLight: Color {
-        Color(red: 0.25 * daylight, green: 0.42 * daylight, blue: 0.20 * daylight)
+        let dim = s.grassDimFactor
+        return Color(red: 0.25 * daylight * dim, green: 0.42 * daylight * dim, blue: 0.20 * daylight * dim)
     }
     private var grassHighlight: Color {
-        Color(red: 0.30 * daylight, green: 0.50 * daylight, blue: 0.22 * daylight)
+        let dim = s.grassDimFactor
+        return Color(red: 0.30 * daylight * dim, green: 0.50 * daylight * dim, blue: 0.22 * daylight * dim)
     }
     private var dirtColor: Color {
-        Color(red: 0.22 * daylight, green: 0.18 * daylight, blue: 0.12 * daylight)
+        let dim = s.grassDimFactor
+        return Color(red: 0.22 * daylight * dim, green: 0.18 * daylight * dim, blue: 0.12 * daylight * dim)
     }
     private var skyColor: Color {
-        isNighttime ? Color(red: 0.02, green: 0.02, blue: 0.08) : .clear
+        if s.cloudOpacity > 0 {
+            return Color(red: 0.05, green: 0.05, blue: 0.12).opacity(s.cloudOpacity)
+        }
+        return isNighttime ? Color(red: 0.02, green: 0.02, blue: 0.08) : .clear
     }
 
     // Season based on month
@@ -528,12 +543,12 @@ struct TurtleSceneView: View {
                 .allowsHitTesting(false)
             }
 
-            // Hearts (when happy)
+            // Hearts (when happy -- larger and more visible)
             ForEach(0 ..< s.hearts.count, id: \.self) { i in
                 let h = s.hearts[i]
                 Text("\u{2665}")
-                    .font(.system(size: 6))
-                    .foregroundColor(Color.red.opacity(h.opacity))
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(Color(red: 1.0, green: 0.2, blue: 0.3).opacity(h.opacity))
                     .offset(
                         x: h.x * width - width / 2,
                         y: h.y * height - height
@@ -746,6 +761,93 @@ struct TurtleSceneView: View {
                     .allowsHitTesting(false)
             }
 
+            // Sparkles (golden glitter when happy)
+            ForEach(0 ..< s.sparkles.count, id: \.self) { i in
+                let sp = s.sparkles[i]
+                Canvas { context, _ in
+                    let star = Path { p in
+                        // 4-point star shape
+                        let sz = sp.size
+                        p.move(to: CGPoint(x: 0, y: -sz))
+                        p.addLine(to: CGPoint(x: sz * 0.3, y: -sz * 0.3))
+                        p.addLine(to: CGPoint(x: sz, y: 0))
+                        p.addLine(to: CGPoint(x: sz * 0.3, y: sz * 0.3))
+                        p.addLine(to: CGPoint(x: 0, y: sz))
+                        p.addLine(to: CGPoint(x: -sz * 0.3, y: sz * 0.3))
+                        p.addLine(to: CGPoint(x: -sz, y: 0))
+                        p.addLine(to: CGPoint(x: -sz * 0.3, y: -sz * 0.3))
+                        p.closeSubpath()
+                    }
+                    context.fill(star, with: .color(Color(red: 1.0, green: 0.85, blue: 0.3).opacity(sp.opacity)))
+                }
+                .frame(width: 10, height: 10)
+                .offset(
+                    x: sp.x * width - width / 2,
+                    y: sp.y * height - height / 2
+                )
+                .allowsHitTesting(false)
+            }
+
+            // Steam puffs (red-tinted when sob/angry)
+            ForEach(0 ..< s.steamPuffs.count, id: \.self) { i in
+                let puff = s.steamPuffs[i]
+                Canvas { context, _ in
+                    let cloud = Path { p in
+                        p.addEllipse(in: CGRect(x: -puff.size, y: -puff.size * 0.6,
+                                                width: puff.size * 2, height: puff.size * 1.2))
+                    }
+                    context.fill(cloud, with: .color(Color(red: 0.85, green: 0.25, blue: 0.15).opacity(puff.opacity * 0.7)))
+                }
+                .frame(width: 14, height: 10)
+                .offset(
+                    x: puff.x * width - width / 2,
+                    y: puff.y * height - height
+                )
+                .allowsHitTesting(false)
+            }
+
+            // Teardrops (visible drops from Sheldon when sad/sob)
+            ForEach(0 ..< s.teardrops.count, id: \.self) { i in
+                let tear = s.teardrops[i]
+                Canvas { context, _ in
+                    // Teardrop shape: small circle with pointed top
+                    let drop = Path { p in
+                        p.addEllipse(in: CGRect(x: -1.5, y: 0, width: 3, height: 4))
+                        p.move(to: CGPoint(x: 0, y: -1))
+                        p.addLine(to: CGPoint(x: -1.5, y: 1))
+                        p.addLine(to: CGPoint(x: 1.5, y: 1))
+                        p.closeSubpath()
+                    }
+                    context.fill(drop, with: .color(Color(red: 0.4, green: 0.6, blue: 0.95).opacity(tear.opacity)))
+                }
+                .frame(width: 6, height: 8)
+                .offset(
+                    x: tear.x * width - width / 2,
+                    y: tear.y * height - height
+                )
+                .allowsHitTesting(false)
+            }
+
+            // Cloud cover overlay (darkens sky when sad/sob)
+            if s.cloudOpacity > 0.05 {
+                Canvas { context, canvasSize in
+                    let w = canvasSize.width
+                    // Draw 4-5 overlapping cloud blobs across the top
+                    let cloudY: CGFloat = 4
+                    for cx in stride(from: CGFloat(-10), through: w + 10, by: 25) {
+                        let c1 = Path { p in p.addEllipse(in: CGRect(x: cx - 12, y: cloudY - 3, width: 24, height: 8)) }
+                        let c2 = Path { p in p.addEllipse(in: CGRect(x: cx - 8, y: cloudY - 5, width: 16, height: 7)) }
+                        let c3 = Path { p in p.addEllipse(in: CGRect(x: cx - 5, y: cloudY - 1, width: 20, height: 6)) }
+                        let color = Color(red: 0.2, green: 0.2, blue: 0.25).opacity(s.cloudOpacity * 0.6)
+                        context.fill(c1, with: .color(color))
+                        context.fill(c2, with: .color(color))
+                        context.fill(c3, with: .color(color))
+                    }
+                }
+                .frame(width: width, height: height)
+                .allowsHitTesting(false)
+            }
+
             // Puddles (after rain evaporates)
             ForEach(0 ..< s.puddles.count, id: \.self) { i in
                 let puddle = s.puddles[i]
@@ -820,13 +922,14 @@ struct TurtleSceneView: View {
                     context.fill(center, with: .color(centerColor))
                 }
                 .frame(width: 24, height: 24)
-                .scaleEffect(s.flowerScale)
+                .scaleEffect(s.flowerScale * s.flowerBloomScale)
                 .offset(
                     x: s.flowerX * width,
                     y: -(height * 0.22)
                 )
                 .transition(.scale.combined(with: .opacity))
                 .animation(.easeInOut(duration: 0.2), value: s.petalCount)
+                .animation(.easeInOut(duration: 0.8), value: s.flowerBloomScale)
             }
 
             // Turtle (walks across scene, flips direction)
@@ -1000,6 +1103,49 @@ struct TurtleSceneView: View {
                 }
             }
 
+            // Sparkles (drift outward and fade)
+            for i in (0 ..< s.sparkles.count).reversed() {
+                s.sparkles[i].y -= 0.006
+                s.sparkles[i].x += CGFloat(sin(s.timePhase * 3 + Double(i) * 1.5)) * 0.003
+                s.sparkles[i].opacity -= 0.012
+                s.sparkles[i].size *= 0.995  // shrink slightly
+                if s.sparkles[i].opacity <= 0 {
+                    s.sparkles.remove(at: i)
+                }
+            }
+
+            // Steam puffs (rise and expand)
+            for i in (0 ..< s.steamPuffs.count).reversed() {
+                s.steamPuffs[i].y -= 0.008
+                s.steamPuffs[i].size *= 1.01  // expand as they rise
+                s.steamPuffs[i].opacity -= 0.01
+                s.steamPuffs[i].x += CGFloat(sin(s.timePhase * 2 + Double(i))) * 0.002
+                if s.steamPuffs[i].opacity <= 0 {
+                    s.steamPuffs.remove(at: i)
+                }
+            }
+
+            // Teardrops (fall from turtle's face)
+            for i in (0 ..< s.teardrops.count).reversed() {
+                s.teardrops[i].y += 0.015
+                s.teardrops[i].opacity -= 0.008
+                if s.teardrops[i].opacity <= 0 || s.teardrops[i].y > 1.0 {
+                    s.teardrops.remove(at: i)
+                }
+            }
+
+            // Cloud opacity transition (smooth)
+            let targetCloud: Double = (emotion == .sad || emotion == .sob) ? (emotion == .sob ? 0.8 : 0.5) : 0
+            s.cloudOpacity += (targetCloud - s.cloudOpacity) * 0.02
+
+            // Grass dim transition (smooth)
+            let targetDim: Double = emotion == .sob ? 0.5 : (emotion == .sad ? 0.7 : 1.0)
+            s.grassDimFactor += (targetDim - s.grassDimFactor) * 0.02
+
+            // Flower bloom scale transition
+            let targetBloom: CGFloat = emotion == .happy ? 1.4 : (emotion == .sad || emotion == .sob ? 0.7 : 1.0)
+            s.flowerBloomScale += (targetBloom - s.flowerBloomScale) * 0.03
+
             // Music notes (float up and fade)
             for i in (0 ..< s.musicNotes.count).reversed() {
                 s.musicNotes[i].y -= 0.008
@@ -1113,21 +1259,47 @@ struct TurtleSceneView: View {
                 }
             }
 
-            // Hearts when happy
-            if emotion == .happy && !s.isSleeping && Int.random(in: 0 ..< 4) == 0 {
-                s.hearts.append((
-                    x: CGFloat(s.walkX) + 0.5 + CGFloat.random(in: -0.02 ... 0.02),
-                    y: 0.6,
-                    opacity: 0.9,
-                    age: 0
-                ))
-                // Cap at 5 s.hearts
-                if s.hearts.count > 5 { s.hearts.removeFirst() }
+            // Hearts when happy (more frequent, from multiple positions)
+            if emotion == .happy && !s.isSleeping {
+                // Spawn 1-2 hearts per tick (was 25% chance of 1)
+                if Int.random(in: 0 ..< 2) == 0 {
+                    s.hearts.append((
+                        x: CGFloat(s.walkX) + 0.5 + CGFloat.random(in: -0.05 ... 0.05),
+                        y: 0.55 + CGFloat.random(in: -0.05 ... 0.05),
+                        opacity: 1.0,
+                        age: 0
+                    ))
+                }
+                // Cap at 8 hearts (was 5)
+                if s.hearts.count > 8 { s.hearts.removeFirst() }
+
+                // Sparkles around the scene when happy
+                if s.sparkles.count < 10 && Int.random(in: 0 ..< 3) == 0 {
+                    s.sparkles.append((
+                        x: CGFloat.random(in: 0.1 ... 0.9),
+                        y: CGFloat.random(in: 0.15 ... 0.55),
+                        opacity: 0.9,
+                        size: CGFloat.random(in: 2.0 ... 4.0)
+                    ))
+                }
+            } else if emotion != .happy {
+                // Clear sparkles when not happy
+                if !s.sparkles.isEmpty && Int.random(in: 0 ..< 4) == 0 {
+                    s.sparkles.removeFirst()
+                }
             }
 
-            // Rain management
-            if (emotion == .sad || emotion == .sob) && s.raindrops.count < 15 {
-                for _ in 0 ..< 3 {
+            // Rain management (heavier when sob)
+            if emotion == .sad && s.raindrops.count < 25 {
+                for _ in 0 ..< 4 {
+                    s.raindrops.append((
+                        x: CGFloat.random(in: 0 ... max(width, 1)),
+                        y: CGFloat.random(in: 0 ... max(height, 1))
+                    ))
+                }
+            } else if emotion == .sob && s.raindrops.count < 40 {
+                // Heavy downpour for sob
+                for _ in 0 ..< 6 {
                     s.raindrops.append((
                         x: CGFloat.random(in: 0 ... max(width, 1)),
                         y: CGFloat.random(in: 0 ... max(height, 1))
@@ -1135,6 +1307,25 @@ struct TurtleSceneView: View {
                 }
             } else if emotion != .sad && emotion != .sob && !s.raindrops.isEmpty {
                 s.raindrops.removeAll()
+            }
+
+            // Steam puffs when sob (anger steam from turtle)
+            if emotion == .sob && !s.isSleeping && s.steamPuffs.count < 6 && Int.random(in: 0 ..< 3) == 0 {
+                s.steamPuffs.append((
+                    x: CGFloat(s.walkX) + 0.5 + CGFloat.random(in: -0.02 ... 0.02),
+                    y: 0.5,
+                    opacity: 0.8,
+                    size: CGFloat.random(in: 2.5 ... 4.0)
+                ))
+            }
+
+            // Teardrops when sad/sob (fall from turtle's eye area)
+            if (emotion == .sad || emotion == .sob) && !s.isSleeping && s.teardrops.count < 4 && Int.random(in: 0 ..< (emotion == .sob ? 2 : 5)) == 0 {
+                s.teardrops.append((
+                    x: CGFloat(s.walkX) + 0.52 + CGFloat.random(in: -0.01 ... 0.01),
+                    y: 0.55,
+                    opacity: 0.9
+                ))
             }
 
             // Shooting stars at night (random, rare)
@@ -1325,6 +1516,17 @@ struct TurtleSceneView: View {
                 s.errorStreak += 1
             } else if newEmotion == .happy || newEmotion == .neutral {
                 s.errorStreak = 0
+            }
+
+            // Clean up emotion-specific particles on transition
+            if newEmotion != .sob {
+                s.steamPuffs.removeAll()
+            }
+            if newEmotion != .sad && newEmotion != .sob {
+                s.teardrops.removeAll()
+            }
+            if newEmotion != .happy {
+                s.sparkles.removeAll()
             }
 
             // Puddles after rain clears (sad/sob -> neutral/happy)
