@@ -186,6 +186,8 @@ struct TurtleSceneView: View {
     @State private var flowerVisible: Bool = false
     @State private var flowerScale: CGFloat = 0
     @State private var flowerEaten: Bool = false
+    @State private var petalCount: Int = 5              // 5 petals, turtle eats them one by one
+    @State private var petalRegrowing: Bool = false
 
     // Life state
     @State private var isBlinking: Bool = false
@@ -272,45 +274,63 @@ struct TurtleSceneView: View {
             }
 
             // Flower (appears when processing, turtle walks to eat it)
+            // Flower with individually visible petals
             if flowerVisible {
                 Canvas { context, canvasSize in
-                    let s = min(height * 0.3, 12) / 12.0
+                    let s = min(height * 0.35, 14) / 14.0
                     let cx = canvasSize.width / 2
                     let cy = canvasSize.height / 2
 
-                    func petal(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, color: Color) {
-                        let r = CGRect(x: (cx + x) * 1, y: (cy + y) * 1, width: w * s, height: h * s)
-                        context.fill(Path(r), with: .color(color))
-                    }
+                    let stemColor = Color(red: 0.25, green: 0.55, blue: 0.18)
+                    let leafColor = Color(red: 0.30, green: 0.62, blue: 0.22)
+                    let petalColor = Color(red: 1.0, green: 0.40, blue: 0.55)
+                    let petalLight = Color(red: 1.0, green: 0.60, blue: 0.70)
+                    let centerColor = Color(red: 1.0, green: 0.82, blue: 0.15)
 
                     // Stem
-                    let stemRect = CGRect(x: cx - 1 * s, y: cy + 2 * s, width: 2 * s, height: 8 * s)
-                    context.fill(Path(stemRect), with: .color(Color(red: 0.3, green: 0.6, blue: 0.2)))
+                    let stem = Path { p in
+                        p.addRect(CGRect(x: cx - 1.5 * s, y: cy + 3 * s, width: 3 * s, height: 10 * s))
+                    }
+                    context.fill(stem, with: .color(stemColor))
 
-                    // Petals (simple pixel flower)
-                    let petalColor = Color(red: 1.0, green: 0.45, blue: 0.5)
-                    let petalRects: [CGRect] = [
-                        CGRect(x: cx - 1 * s, y: cy - 5 * s, width: 3 * s, height: 3 * s), // top
-                        CGRect(x: cx + 2 * s, y: cy - 2 * s, width: 3 * s, height: 3 * s), // right
-                        CGRect(x: cx - 4 * s, y: cy - 2 * s, width: 3 * s, height: 3 * s), // left
-                        CGRect(x: cx + 1 * s, y: cy + 1 * s, width: 3 * s, height: 3 * s), // bottom-right
-                        CGRect(x: cx - 3 * s, y: cy + 1 * s, width: 3 * s, height: 3 * s), // bottom-left
-                    ]
-                    for r in petalRects {
-                        context.fill(Path(r), with: .color(petalColor))
+                    // Small leaf on stem
+                    let leaf = Path { p in
+                        p.addEllipse(in: CGRect(x: cx + 1 * s, y: cy + 6 * s, width: 5 * s, height: 3 * s))
+                    }
+                    context.fill(leaf, with: .color(leafColor))
+
+                    // Petals (round ellipses arranged in a circle)
+                    let petalAngles: [Double] = [0, 72, 144, 216, 288]  // 5 petals evenly spaced
+                    let petalRadius: CGFloat = 5 * s
+                    let petalW: CGFloat = 5 * s
+                    let petalH: CGFloat = 7 * s
+
+                    for (i, angle) in petalAngles.enumerated() {
+                        guard i < petalCount else { continue }
+                        let rad = angle * .pi / 180
+                        let px = cx + cos(rad) * petalRadius - petalW / 2
+                        let py = cy - 1 * s + sin(rad) * petalRadius - petalH / 2
+                        let petal = Path { p in
+                            p.addEllipse(in: CGRect(x: px, y: py, width: petalW, height: petalH))
+                        }
+                        let c = i % 2 == 0 ? petalColor : petalLight
+                        context.fill(petal, with: .color(c))
                     }
 
-                    // Center
-                    let centerRect = CGRect(x: cx - 1.5 * s, y: cy - 1.5 * s, width: 4 * s, height: 4 * s)
-                    context.fill(Path(centerRect), with: .color(Color(red: 1.0, green: 0.85, blue: 0.2)))
+                    // Center (always visible)
+                    let center = Path { p in
+                        p.addEllipse(in: CGRect(x: cx - 3 * s, y: cy - 4 * s, width: 6 * s, height: 6 * s))
+                    }
+                    context.fill(center, with: .color(centerColor))
                 }
-                .frame(width: 20, height: 20)
+                .frame(width: 24, height: 24)
                 .scaleEffect(flowerScale)
                 .offset(
                     x: flowerX * width,
                     y: -(height * 0.15)
                 )
                 .transition(.scale.combined(with: .opacity))
+                .animation(.easeInOut(duration: 0.2), value: petalCount)
             }
 
             // Turtle (walks across scene, flips direction)
@@ -490,6 +510,8 @@ struct TurtleSceneView: View {
         let side: CGFloat = walkX > 0 ? -1 : 1
         flowerX = side * CGFloat.random(in: 0.28 ... 0.42)
         flowerEaten = false
+        petalCount = 5
+        petalRegrowing = false
         flowerVisible = true
         flowerScale = 0
 
@@ -509,27 +531,66 @@ struct TurtleSceneView: View {
         guard !flowerEaten else { return }
         flowerEaten = true
 
-        // Head lunge forward (eating)
-        withAnimation(.spring(response: 0.15, dampingFraction: 0.5)) {
-            headExtension = 5
-        }
-
-        // Flower shrinks as eaten
-        withAnimation(.easeIn(duration: 0.3)) {
-            flowerScale = 0
-        }
-
+        // Eat petals one by one with head lunges
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(300))
-            withAnimation(.easeOut(duration: 0.2)) { headExtension = 0 }
-            flowerVisible = false
-
-            // If still processing, spawn another flower after a pause
-            if isProcessing {
-                try? await Task.sleep(for: .seconds(Double.random(in: 1.5 ... 3.0)))
-                if isProcessing {
-                    spawnFlower()
+            for petal in stride(from: petalCount, to: 0, by: -1) {
+                // Head lunge
+                withAnimation(.spring(response: 0.12, dampingFraction: 0.5)) {
+                    headExtension = 4
                 }
+                try? await Task.sleep(for: .milliseconds(200))
+
+                // Remove a petal
+                withAnimation(.easeOut(duration: 0.15)) {
+                    petalCount = petal - 1
+                }
+
+                // Head back
+                withAnimation(.easeOut(duration: 0.1)) {
+                    headExtension = 0
+                }
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+
+            // All petals eaten, turtle walks away
+            // Start regrowing petals after turtle leaves
+            petalRegrowing = true
+            startPetalRegrowth()
+
+            // If still processing, turtle walks to other side then comes back
+            if isProcessing {
+                // Walk away from flower
+                let awayDirection: CGFloat = walkX > 0 ? -1 : 1
+                walkDirection = awayDirection
+                facingRight = walkDirection > 0
+                isWalking = true
+            }
+        }
+    }
+
+    private func startPetalRegrowth() {
+        Task { @MainActor in
+            // Wait a bit before regrowing
+            try? await Task.sleep(for: .seconds(2.0))
+
+            // Regrow petals one by one
+            for p in 1 ... 5 {
+                guard flowerVisible && petalRegrowing else { return }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    petalCount = p
+                }
+                try? await Task.sleep(for: .milliseconds(600))
+            }
+
+            // Flower is fully regrown, turtle can come eat it again
+            petalRegrowing = false
+            flowerEaten = false
+
+            if isProcessing {
+                // Point turtle back toward flower
+                walkDirection = flowerX > walkX ? 1 : -1
+                facingRight = walkDirection > 0
+                isWalking = true
             }
         }
     }
