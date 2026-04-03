@@ -652,12 +652,12 @@ struct TurtleSceneView: View {
                 size: min(height * 0.75, 28),
                 animateLegs: (s.isWalking && !s.isSleeping && !s.isEating) || (isProcessing && !s.isSleeping && !s.isEating),
                 emotion: emotion,
-                s.isBlinking: s.isBlinking,
-                s.headExtension: s.headExtension,
-                s.isSleeping: s.isSleeping,
-                s.mouthOpen: s.mouthOpen,
-                s.lookingUp: s.lookingUp,
-                s.hiddenInShell: s.hiddenInShell,
+                isBlinking: s.isBlinking,
+                headExtension: s.headExtension,
+                isSleeping: s.isSleeping,
+                mouthOpen: s.mouthOpen,
+                lookingUp: s.lookingUp,
+                hiddenInShell: s.hiddenInShell,
                 hatType: currentHat,
                 shellProgress: 0
             )
