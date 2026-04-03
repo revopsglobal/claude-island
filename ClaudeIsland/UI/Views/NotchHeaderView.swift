@@ -397,10 +397,11 @@ struct TurtleSceneView: View {
         return .none
     }
 
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            // Grass island
-            Canvas { context, canvasSize in
+    // MARK: - Sub-views (broken out to help the type checker)
+
+    @ViewBuilder
+    private var grassCanvas: some View {
+        Canvas { context, canvasSize in
                 let w = canvasSize.width
                 let h = canvasSize.height
                 let grassTop = h * 0.55
@@ -458,6 +459,10 @@ struct TurtleSceneView: View {
                 }
             }
 
+    }
+
+    @ViewBuilder
+    private var natureOverlay: some View {
             // Butterflies
             ForEach(0 ..< s.butterflies.count, id: \.self) { i in
                 let b = s.butterflies[i]
@@ -588,6 +593,10 @@ struct TurtleSceneView: View {
                 .allowsHitTesting(false)
             }
 
+    }
+
+    @ViewBuilder
+    private var flowerAndTurtle: some View {
             // Flower with individually visible petals
             if s.flowerVisible {
                 Canvas { context, canvasSize in
@@ -678,6 +687,13 @@ struct TurtleSceneView: View {
                     withAnimation(.easeOut(duration: 0.2)) { s.spinAngle = 0 }
                 }
             }
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            grassCanvas
+            natureOverlay
+            flowerAndTurtle
         }
         .frame(width: width, height: height)
         .onReceive(motionTimer) { now in
