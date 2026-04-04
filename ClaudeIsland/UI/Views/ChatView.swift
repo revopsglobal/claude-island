@@ -422,12 +422,25 @@ struct ChatView: View {
     /// Bar for interactive tools like AskUserQuestion -- answer directly from the app
     private var interactivePromptBar: some View {
         ChatInteractivePromptBar(
-            question: session.activePermission?.questionText,
+            parsedQuestions: session.activePermission?.parsedQuestions,
+            questionText: session.activePermission?.questionText,
             canSend: canSendMessages,
             onSend: { answer in
-                Task { await sendToSession(answer) }
+                // First approve the permission (unblocks the hook, allows the tool to run)
+                approvePermission()
+                // Then send the answer to the terminal after the tool shows its prompt
+                Task {
+                    try? await Task.sleep(for: .milliseconds(800))
+                    await sendToSession(answer)
+                }
             },
-            onGoToTerminal: { focusTerminal() }
+            onDismiss: {
+                denyPermission()
+            },
+            onGoToTerminal: {
+                approvePermission()
+                focusTerminal()
+            }
         )
     }
 
@@ -985,69 +998,198 @@ struct InterruptedMessageView: View {
 
 // MARK: - Chat Interactive Prompt Bar
 
-/// Bar for interactive tools like AskUserQuestion -- inline answer field
+/// Bar for AskUserQuestion -- shows options as chips + "Other" text field
 struct ChatInteractivePromptBar: View {
-    let question: String?
+    let parsedQuestions: [PermissionContext.ParsedQuestion]?
+    let questionText: String?
     let canSend: Bool
     let onSend: (String) -> Void
+    let onDismiss: () -> Void
     let onGoToTerminal: () -> Void
 
-    @State private var answerText: String = ""
+    @State private var otherText: String = ""
     @State private var showContent = false
-    @FocusState private var isInputFocused: Bool
+    @State private var selectedOption: String? = nil
+    @State private var hoveredOption: String? = nil
+    @State private var showOtherField = false
+    @State private var isDismissHovered = false
+    @FocusState private var isOtherFocused: Bool
+
+    private var firstQuestion: PermissionContext.ParsedQuestion? {
+        parsedQuestions?.first
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Question from Claude
-            if let question = question {
-                Text(question)
-                    .font(.system(size: 12))
-                    .foregroundColor(TerminalColors.amber)
-                    .lineLimit(3)
-                    .opacity(showContent ? 1 : 0)
-                    .offset(y: showContent ? 0 : 5)
-            } else {
-                Text("Claude is asking a question")
-                    .font(.system(size: 12))
-                    .foregroundColor(TerminalColors.amber)
-                    .opacity(showContent ? 1 : 0)
-            }
-
-            // Answer input
-            HStack(spacing: 8) {
-                TextField("Type your answer...", text: $answerText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .foregroundColor(canSend ? .white : .white.opacity(0.4))
-                    .focused($isInputFocused)
-                    .disabled(!canSend)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.white.opacity(canSend ? 0.08 : 0.04))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .strokeBorder(TerminalColors.amber.opacity(0.3), lineWidth: 1)
-                            )
-                    )
-                    .onSubmit {
-                        submitAnswer()
+        VStack(alignment: .leading, spacing: 10) {
+            // Header row with question + dismiss
+            HStack(alignment: .top) {
+                // Question text
+                Group {
+                    if let q = firstQuestion {
+                        Text(q.text)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(TerminalColors.amber)
+                            .lineLimit(4)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if let text = questionText {
+                        Text(text)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(TerminalColors.amber)
+                            .lineLimit(4)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("Claude is asking a question")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(TerminalColors.amber)
                     }
+                }
+                Spacer(minLength: 8)
 
+                // Dismiss button
                 Button {
-                    submitAnswer()
+                    onDismiss()
                 } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundColor(!canSend || answerText.isEmpty ? .white.opacity(0.2) : TerminalColors.amber.opacity(0.9))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(isDismissHovered ? .white.opacity(0.8) : .white.opacity(0.3))
+                        .frame(width: 20, height: 20)
+                        .background(
+                            Circle()
+                                .fill(isDismissHovered ? Color.white.opacity(0.15) : Color.clear)
+                        )
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .contentShape(Circle())
-                .disabled(!canSend || answerText.isEmpty)
+                .onHover { isDismissHovered = $0 }
             }
-            .opacity(showContent ? 1 : 0)
+
+            // Option chips
+            if let q = firstQuestion, !q.options.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(q.options.enumerated()), id: \.offset) { _, option in
+                        Button {
+                            selectedOption = option.label
+                            if canSend {
+                                onSend(option.label)
+                            } else {
+                                onGoToTerminal()
+                            }
+                        } label: {
+                            HStack(alignment: .top, spacing: 8) {
+                                Text(option.label)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(
+                                        selectedOption == option.label ? .black :
+                                        hoveredOption == option.label ? .white : .white.opacity(0.9)
+                                    )
+                                if !option.description.isEmpty {
+                                    Text(option.description)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(
+                                            selectedOption == option.label ? .black.opacity(0.7) :
+                                            .white.opacity(0.5)
+                                        )
+                                        .lineLimit(2)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(
+                                        selectedOption == option.label ? TerminalColors.amber :
+                                        hoveredOption == option.label ? Color.white.opacity(0.12) :
+                                        Color.white.opacity(0.06)
+                                    )
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .strokeBorder(
+                                        selectedOption == option.label ? TerminalColors.amber :
+                                        Color.white.opacity(0.1),
+                                        lineWidth: 1
+                                    )
+                            )
+                            .contentShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                        .onHover { hoveredOption = $0 ? option.label : nil }
+                    }
+                }
+            }
+
+            // Bottom row: "Other" toggle + "Answer in Terminal" link
+            HStack(spacing: 12) {
+                if !showOtherField {
+                    Button {
+                        showOtherField = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            isOtherFocused = true
+                        }
+                    } label: {
+                        Text("Other...")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.white.opacity(0.04))
+                            )
+                            .contentShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer(minLength: 0)
+
+                Button {
+                    onGoToTerminal()
+                } label: {
+                    Text("Answer in Terminal")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.3))
+                }
+                .buttonStyle(.plain)
+            }
+
+            // "Other" text field (expanded)
+            if showOtherField {
+                HStack(spacing: 8) {
+                    TextField("Type your answer...", text: $otherText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                        .foregroundColor(canSend ? .white : .white.opacity(0.4))
+                        .focused($isOtherFocused)
+                        .disabled(!canSend)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color.white.opacity(canSend ? 0.08 : 0.04))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .strokeBorder(TerminalColors.amber.opacity(0.3), lineWidth: 1)
+                                )
+                        )
+                        .onSubmit { submitOther() }
+
+                    Button {
+                        submitOther()
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(!canSend || otherText.isEmpty ? .white.opacity(0.2) : TerminalColors.amber.opacity(0.9))
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Circle())
+                    .disabled(!canSend || otherText.isEmpty)
+                }
+            }
         }
+        .opacity(showContent ? 1 : 0)
+        .offset(y: showContent ? 0 : 8)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color.black.opacity(0.2))
@@ -1055,17 +1197,13 @@ struct ChatInteractivePromptBar: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.05)) {
                 showContent = true
             }
-            // Auto-focus the input
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                isInputFocused = true
-            }
         }
     }
 
-    private func submitAnswer() {
-        let text = answerText.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func submitOther() {
+        let text = otherText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, canSend else { return }
-        answerText = ""
+        otherText = ""
         onSend(text)
     }
 }

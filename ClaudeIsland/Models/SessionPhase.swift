@@ -15,12 +15,48 @@ struct PermissionContext: Sendable {
     let toolInput: [String: AnyCodable]?
     let receivedAt: Date
 
-    /// Extract the question text from AskUserQuestion tool input
-    var questionText: String? {
+    /// Parsed question for AskUserQuestion tool
+    struct ParsedQuestion {
+        let text: String
+        let header: String
+        let options: [(label: String, description: String)]
+        let multiSelect: Bool
+    }
+
+    /// Extract structured question data from AskUserQuestion tool input
+    var parsedQuestions: [ParsedQuestion]? {
         guard toolName == "AskUserQuestion",
               let input = toolInput,
-              let question = input["question"]?.value as? String else { return nil }
-        return question
+              let questionsRaw = input["questions"]?.value as? [[String: Any]] else { return nil }
+
+        var result: [ParsedQuestion] = []
+        for q in questionsRaw {
+            guard let text = q["question"] as? String,
+                  let header = q["header"] as? String,
+                  let optionsRaw = q["options"] as? [[String: Any]] else { continue }
+
+            let options = optionsRaw.compactMap { opt -> (label: String, description: String)? in
+                guard let label = opt["label"] as? String,
+                      let desc = opt["description"] as? String else { return nil }
+                return (label: label, description: desc)
+            }
+
+            let multiSelect = q["multiSelect"] as? Bool ?? false
+            result.append(ParsedQuestion(text: text, header: header, options: options, multiSelect: multiSelect))
+        }
+        return result.isEmpty ? nil : result
+    }
+
+    /// Simple question text fallback (for non-structured questions)
+    var questionText: String? {
+        guard toolName == "AskUserQuestion",
+              let input = toolInput else { return nil }
+        // Try structured first
+        if let questions = parsedQuestions, let first = questions.first {
+            return first.text
+        }
+        // Fallback to flat question field
+        return (input["question"]?.value as? String)
     }
 
     /// Format tool input for display
