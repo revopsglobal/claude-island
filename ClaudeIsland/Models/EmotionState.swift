@@ -32,13 +32,13 @@ final class EmotionState {
 
     // MARK: - Thresholds
 
-    static let sadThreshold = 0.45
-    static let happyThreshold = 0.6
-    static let sobEscalationThreshold = 0.9
-    static let curiousThreshold = 0.5
-    static let excitedThreshold = 0.7
-    static let confusedThreshold = 0.5
-    static let intensityDampen = 0.5
+    static let sadThreshold = 0.30
+    static let happyThreshold = 0.35
+    static let sobEscalationThreshold = 0.75
+    static let curiousThreshold = 0.30
+    static let excitedThreshold = 0.40
+    static let confusedThreshold = 0.30
+    static let intensityDampen = 0.85
     static let decayRate = 0.92
     static let interEmotionDecay = 0.9
     static let neutralCounterDecay = 0.85

@@ -20,6 +20,7 @@ struct NotchView: View {
     @StateObject private var sessionMonitor = ClaudeSessionMonitor()
     @StateObject private var activityCoordinator = NotchActivityCoordinator.shared
     @ObservedObject private var updateManager = UpdateManager.shared
+    @ObservedObject private var emotionManager = EmotionManager.shared
     @State private var previousPendingIds: Set<String> = []
     @State private var previousWaitingForInputIds: Set<String> = []
     @State private var waitingForInputTimestamps: [String: Date] = [:]  // sessionId -> when it entered waitingForInput
@@ -36,7 +37,7 @@ struct NotchView: View {
             $0.phase == .processing || $0.phase.isWaitingForApproval
         }) ?? sessionMonitor.instances.first
         guard let session = activeSession else { return .neutral }
-        let emo = EmotionManager.shared.emotion(for: session.sessionId)
+        let emo = emotionManager.sessionEmotions[session.sessionId] ?? .neutral
         return emo
     }
 

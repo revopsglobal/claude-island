@@ -6,18 +6,18 @@
 //  Provides per-session emotion state for the UI layer.
 //
 
+import Combine
 import Foundation
 import os.log
 
 private let logger = Logger(subsystem: "com.claudeisland", category: "EmotionManager")
 
 @MainActor
-@Observable
-final class EmotionManager {
+final class EmotionManager: ObservableObject {
     static let shared = EmotionManager()
 
-    /// Per-session emotion states
-    private(set) var sessionEmotions: [String: CrabEmotion] = [:]
+    /// Per-session emotion states -- @Published so SwiftUI views re-render on change
+    @Published private(set) var sessionEmotions: [String: CrabEmotion] = [:]
 
     /// Internal emotion state objects per session
     private var states: [String: EmotionState] = [:]
