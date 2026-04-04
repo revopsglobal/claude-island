@@ -18,20 +18,39 @@ final class EmotionAnalyzer {
 
     nonisolated private static let validEmotions: Set<String> = ["happy", "sad", "neutral", "curious", "excited", "confused"]
     private var apiKey: String?
+    private var lastKeyCheck: Date = .distantPast
+    private var consecutiveFailures: Int = 0
+
+    /// Re-check the API key every 5 minutes in case it was rotated
+    private static let keyRefreshInterval: TimeInterval = 300
 
     private init() {
         apiKey = Self.loadAPIKey()
     }
 
     func analyze(_ prompt: String) async -> (emotion: String, intensity: Double) {
+        // Periodically re-check API key (handles rotation, new config file)
+        if Date().timeIntervalSince(lastKeyCheck) > Self.keyRefreshInterval || apiKey == nil {
+            apiKey = Self.loadAPIKey()
+            lastKeyCheck = Date()
+        }
+
         guard let key = apiKey, !key.isEmpty else {
             logger.info("No Anthropic API key configured, defaulting to neutral")
             return ("neutral", 0.0)
         }
 
         do {
-            return try await callAPI(prompt: prompt, apiKey: key)
+            let result = try await callAPI(prompt: prompt, apiKey: key)
+            consecutiveFailures = 0
+            return result
         } catch {
+            consecutiveFailures += 1
+            // After 3 consecutive failures, force a key refresh on next call
+            if consecutiveFailures >= 3 {
+                logger.warning("3 consecutive emotion API failures, will refresh key on next call")
+                lastKeyCheck = .distantPast
+            }
             logger.error("Emotion analysis failed: \(error.localizedDescription)")
             return ("neutral", 0.0)
         }
@@ -79,6 +98,10 @@ final class EmotionAnalyzer {
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
             logger.error("API returned status \(statusCode)")
+            // Force key refresh on auth errors
+            if statusCode == 401 || statusCode == 403 {
+                lastKeyCheck = .distantPast
+            }
             return ("neutral", 0.0)
         }
 
