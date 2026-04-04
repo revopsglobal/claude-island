@@ -137,11 +137,19 @@ def main():
             reason = response.get("reason", "")
 
             if decision == "allow":
-                # Output JSON to approve
+                # Build the decision payload
+                decision_payload = {"behavior": "allow"}
+
+                # If the app provided updatedInput (e.g. answers for AskUserQuestion),
+                # include it so Claude Code uses the answer without showing the picker
+                updated_input = response.get("updatedInput")
+                if updated_input:
+                    decision_payload["updatedInput"] = updated_input
+
                 output = {
                     "hookSpecificOutput": {
                         "hookEventName": "PermissionRequest",
-                        "decision": {"behavior": "allow"},
+                        "decision": decision_payload,
                     }
                 }
                 print(json.dumps(output))

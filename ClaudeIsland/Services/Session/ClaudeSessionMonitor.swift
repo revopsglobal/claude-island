@@ -122,6 +122,31 @@ class ClaudeSessionMonitor: ObservableObject {
         }
     }
 
+    /// Answer an AskUserQuestion by sending "allow" with the answer in updatedInput.
+    /// Works for both tmux and non-tmux sessions (no terminal interaction needed).
+    func answerQuestion(sessionId: String, questionText: String, answer: String) {
+        Task {
+            guard let session = await SessionStore.shared.session(for: sessionId),
+                  let permission = session.activePermission else {
+                return
+            }
+
+            // Build updatedInput: original questions + answers map
+            var updatedInput = permission.toolInput ?? [:]
+            updatedInput["answers"] = AnyCodable([questionText: answer])
+
+            HookSocketServer.shared.respondToPermission(
+                toolUseId: permission.toolUseId,
+                decision: "allow",
+                updatedInput: updatedInput
+            )
+
+            await SessionStore.shared.process(
+                .permissionApproved(sessionId: sessionId, toolUseId: permission.toolUseId)
+            )
+        }
+    }
+
     func denyPermission(sessionId: String, reason: String?) {
         Task {
             guard let session = await SessionStore.shared.session(for: sessionId),

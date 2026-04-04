@@ -421,39 +421,18 @@ struct ChatView: View {
 
     /// Bar for interactive tools like AskUserQuestion -- answer directly from the app
     private var interactivePromptBar: some View {
-        // Capture option count for "Type something." index calculation
-        let optionCount = session.activePermission?.parsedQuestions?.first?.options.count ?? 0
+        let questionText = session.activePermission?.parsedQuestions?.first?.text
+            ?? session.activePermission?.questionText
+            ?? ""
 
         return ChatInteractivePromptBar(
             parsedQuestions: session.activePermission?.parsedQuestions,
             questionText: session.activePermission?.questionText,
-            canSend: canSendMessages,
-            onSend: { answer, pickerIndex in
-                // Passthrough: tell the hook to exit without a decision so Claude Code
-                // shows its interactive picker in the terminal
-                passthroughPermission()
-
-                Task {
-                    // Wait for the picker to render in the terminal
-                    try? await Task.sleep(for: .milliseconds(1200))
-
-                    guard let target = await findTmuxTargetForSession() else { return }
-
-                    if let index = pickerIndex {
-                        // User clicked an option chip -- arrow down to it and press Enter
-                        _ = await ToolApprovalHandler.shared.selectPickerOption(
-                            index: index,
-                            target: target
-                        )
-                    } else {
-                        // User typed custom text -- select "Type something." then type it
-                        _ = await ToolApprovalHandler.shared.selectPickerCustom(
-                            typeOptionIndex: optionCount,
-                            text: answer,
-                            target: target
-                        )
-                    }
-                }
+            canSend: true, // Always allow -- answers go through hook protocol, not tmux
+            onSend: { answer, _ in
+                // Send "allow" with the answer baked into updatedInput.
+                // Works for all sessions (tmux and non-tmux).
+                answerQuestion(questionText: questionText, answer: answer)
             },
             onDismiss: {
                 denyPermission()
@@ -501,14 +480,12 @@ struct ChatView: View {
         sessionMonitor.passthroughPermission(sessionId: sessionId)
     }
 
-    private func denyPermission() {
-        sessionMonitor.denyPermission(sessionId: sessionId, reason: nil)
+    private func answerQuestion(questionText: String, answer: String) {
+        sessionMonitor.answerQuestion(sessionId: sessionId, questionText: questionText, answer: answer)
     }
 
-    /// Find the tmux target for the current session's TTY
-    private func findTmuxTargetForSession() async -> TmuxTarget? {
-        guard session.isInTmux, let tty = session.tty else { return nil }
-        return await findTmuxTarget(tty: tty)
+    private func denyPermission() {
+        sessionMonitor.denyPermission(sessionId: sessionId, reason: nil)
     }
 
     private func sendMessage() {
