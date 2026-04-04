@@ -1216,7 +1216,7 @@ struct TurtleSceneView: View {
                     if abs(dist) > 0.05 {
                         s.walkX += dist * 0.008  // ease toward cursor
                         // Clamp to edges
-                        s.walkX = max(-0.45, min(0.45, s.walkX))
+                        s.walkX = max(-0.38, min(0.45, s.walkX))
                     }
                 }
             case .ended:
@@ -1429,7 +1429,7 @@ struct TurtleSceneView: View {
             guard !s.isEating else { return }
             guard isProcessing else {
                 // Walk to resting spot when idle (visible edges, not behind notch)
-                let leftRest: CGFloat = -0.45
+                let leftRest: CGFloat = -0.38
                 let rightRest: CGFloat = 0.45
                 let restTarget = s.walkDirection >= 0 ? rightRest : leftRest
                 let distToRest = abs(s.walkX - restTarget)
@@ -1460,8 +1460,8 @@ struct TurtleSceneView: View {
             let speed: CGFloat = abs(s.walkX) < 0.15 ? baseSpeed * 3 : baseSpeed
             s.walkX += s.walkDirection * speed
 
-            // Edge boundaries
-            let leftEdge: CGFloat = -0.45
+            // Edge boundaries (keep margin so Sheldon doesn't clip the edge)
+            let leftEdge: CGFloat = -0.38
             let rightEdge: CGFloat = 0.45
             if true {
 
