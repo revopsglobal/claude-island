@@ -1208,8 +1208,8 @@ struct TurtleSceneView: View {
             case .active(let location):
                 s.cursorNearNotch = true
                 s.cursorX = (location.x / max(width, 1)) - 0.5  // -0.5 to 0.5
-                // Sheldon looks toward cursor when idle and nudges toward it
-                if !s.isWalking && !s.isEating && !s.isSleeping {
+                // Sheldon looks toward cursor only when truly idle (not walking, eating, sleeping, or processing)
+                if !s.isWalking && !s.isEating && !s.isSleeping && !isProcessing && !needsAttention {
                     s.facingRight = s.cursorX > s.walkX
                     // Gentle nudge toward cursor (very slow creep)
                     let dist = s.cursorX - s.walkX
@@ -1862,6 +1862,8 @@ struct TurtleSceneView: View {
         s.flowerEaten = true
         s.isEating = true
         s.isWalking = false  // Stop walking to eat
+        // Face toward the flower so Sheldon doesn't eat with his butt
+        s.facingRight = s.flowerX > s.walkX
 
         // Eat petals one by one with mouth chomping
         Task { @MainActor in
