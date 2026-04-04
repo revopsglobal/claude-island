@@ -24,6 +24,9 @@ struct NotchView: View {
     @State private var previousPendingIds: Set<String> = []
     @State private var previousWaitingForInputIds: Set<String> = []
     @State private var waitingForInputTimestamps: [String: Date] = [:]  // sessionId -> when it entered waitingForInput
+    @State private var approvalTimestamps: [String: Date] = [:]  // sessionId -> when it entered waitingForApproval
+    @State private var debouncedApprovalVisible: Bool = false  // only true after debounce threshold
+    @State private var approvalDebounceTask: Task<Void, Never>? = nil
     @State private var isVisible: Bool = false
     @State private var isHovering: Bool = false
     @State private var isBouncing: Bool = false
@@ -46,10 +49,19 @@ struct NotchView: View {
         sessionMonitor.instances.contains { $0.phase == .processing || $0.phase == .compacting }
     }
 
-    /// Whether any Claude session has a pending permission request
-    private var hasPendingPermission: Bool {
+    /// Whether any Claude session has a pending permission request (raw, no debounce)
+    private var hasRawPendingPermission: Bool {
         sessionMonitor.instances.contains { $0.phase.isWaitingForApproval }
     }
+
+    /// Whether any Claude session has a pending permission request (debounced to filter auto-approvals)
+    private var hasPendingPermission: Bool {
+        debouncedApprovalVisible
+    }
+
+    /// Debounce threshold: only show approval UI after permission has been pending this long.
+    /// Filters out auto-approved tools that flash PermissionRequest then immediately resolve.
+    private static let approvalDebounceSeconds: TimeInterval = 2.5
 
     /// Whether any Claude session is waiting for user input (done/ready state) within the display window
     private var hasWaitingForInput: Bool {
@@ -236,6 +248,7 @@ struct NotchView: View {
         .onChange(of: sessionMonitor.instances) { _, instances in
             handleProcessingChange()
             handleWaitingForInputChange(instances)
+            handleApprovalDebounce(instances)
             // Wire luminbeat detection to turtle scene
             TurtleSceneState.shared.hasLuminbeatSession = instances.contains {
                 $0.projectName.lowercased().contains("luminbeat") ||
@@ -561,6 +574,66 @@ struct NotchView: View {
         }
 
         previousWaitingForInputIds = currentIds
+    }
+
+    /// Debounce approval UI to filter out auto-approved tools.
+    /// Only shows the approval bar after a permission has been pending for the debounce threshold.
+    private func handleApprovalDebounce(_ instances: [SessionState]) {
+        let pendingSessions = instances.filter { $0.phase.isWaitingForApproval }
+
+        if pendingSessions.isEmpty {
+            // No pending permissions: immediately hide and cancel any timer
+            approvalDebounceTask?.cancel()
+            approvalDebounceTask = nil
+            approvalTimestamps.removeAll()
+            if debouncedApprovalVisible {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    debouncedApprovalVisible = false
+                }
+            }
+            return
+        }
+
+        // Track when each session first entered approval state
+        let now = Date()
+        for session in pendingSessions {
+            if approvalTimestamps[session.stableId] == nil {
+                approvalTimestamps[session.stableId] = now
+            }
+        }
+
+        // Clean up stale entries
+        let currentIds = Set(pendingSessions.map { $0.stableId })
+        for key in approvalTimestamps.keys where !currentIds.contains(key) {
+            approvalTimestamps.removeValue(forKey: key)
+        }
+
+        // Check if any session has been pending long enough
+        let oldestPending = approvalTimestamps.values.min() ?? now
+        let elapsed = now.timeIntervalSince(oldestPending)
+
+        if elapsed >= Self.approvalDebounceSeconds {
+            // Already past threshold, show immediately
+            if !debouncedApprovalVisible {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    debouncedApprovalVisible = true
+                }
+            }
+        } else if approvalDebounceTask == nil {
+            // Schedule showing after remaining time
+            let remaining = Self.approvalDebounceSeconds - elapsed
+            approvalDebounceTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(remaining))
+                guard !Task.isCancelled else { return }
+                // Re-check that permission is still pending
+                if hasRawPendingPermission {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        debouncedApprovalVisible = true
+                    }
+                }
+                approvalDebounceTask = nil
+            }
+        }
     }
 
     /// Determine if notification sound should play for the given sessions

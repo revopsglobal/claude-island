@@ -129,14 +129,19 @@ struct InstanceRow: View {
     @State private var isHovered = false
     @State private var spinnerPhase = 0
     @State private var isYabaiAvailable = false
+    @State private var approvalVisible = false
+    @State private var approvalDebounceTask: Task<Void, Never>? = nil
 
     private let claudeOrange = Color(red: 0.85, green: 0.47, blue: 0.34)
     private let spinnerSymbols = ["·", "✢", "✳", "∗", "✻", "✽"]
     private let spinnerTimer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
 
-    /// Whether we're showing the approval UI
+    /// Debounce threshold: only show approval UI after permission has been pending this long
+    private static let approvalDebounceSeconds: TimeInterval = 2.5
+
+    /// Whether we're showing the approval UI (debounced to filter auto-approved flashes)
     private var isWaitingForApproval: Bool {
-        session.phase.isWaitingForApproval
+        approvalVisible
     }
 
     /// Whether the pending tool requires interactive input (not just approve/deny)
@@ -287,6 +292,29 @@ struct InstanceRow: View {
                 .fill(isHovered ? Color.white.opacity(0.06) : Color.clear)
         )
         .onHover { isHovered = $0 }
+        .onChange(of: session.phase.isWaitingForApproval) { _, isWaiting in
+            if !isWaiting {
+                approvalDebounceTask?.cancel()
+                approvalDebounceTask = nil
+                if approvalVisible {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        approvalVisible = false
+                    }
+                }
+            } else {
+                approvalDebounceTask?.cancel()
+                approvalDebounceTask = Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(Self.approvalDebounceSeconds))
+                    guard !Task.isCancelled else { return }
+                    if session.phase.isWaitingForApproval {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            approvalVisible = true
+                        }
+                    }
+                    approvalDebounceTask = nil
+                }
+            }
+        }
         .task {
             isYabaiAvailable = await WindowFinder.shared.isYabaiAvailable()
         }
