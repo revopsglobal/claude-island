@@ -123,9 +123,24 @@ def main():
             state["tool_use_id"] = tool_use_id_from_event
 
     elif event == "PermissionRequest":
-        # This is where we can control the permission
+        tool_name = data.get("tool_name")
+
+        # Tools that need human interaction (questions, input)
+        INTERACTIVE_TOOLS = {"AskUserQuestion"}
+
+        # Auto-approve non-interactive tools: send event for monitoring
+        # but don't block waiting for a decision from the app
+        if tool_name not in INTERACTIVE_TOOLS:
+            state["status"] = "running_tool"
+            state["tool"] = tool_name
+            state["tool_input"] = tool_input
+            send_event(state)
+            # Let Claude Code handle its own permissions (bypass/accept mode)
+            sys.exit(0)
+
+        # Interactive tools: send to app and wait for user decision
         state["status"] = "waiting_for_approval"
-        state["tool"] = data.get("tool_name")
+        state["tool"] = tool_name
         state["tool_input"] = tool_input
         # tool_use_id lookup handled by Swift-side cache from PreToolUse
 
