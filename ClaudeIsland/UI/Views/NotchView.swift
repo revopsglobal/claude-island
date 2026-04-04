@@ -250,6 +250,11 @@ struct NotchView: View {
         activityCoordinator.expandingActivity.show && activityCoordinator.expandingActivity.type == .claude
     }
 
+    /// Whether Sheldon should do his attention bounce (only for permission requests that need a decision)
+    private var needsAttention: Bool {
+        hasPendingPermission
+    }
+
     /// Whether to show the turtle scene in closed state
     /// Always show when there are active sessions (turtle sleeps when idle)
     private var showClosedActivity: Bool {
@@ -296,6 +301,7 @@ struct NotchView: View {
                 TurtleSceneView(
                     emotion: primaryEmotion,
                     isProcessing: isProcessing,
+                    needsAttention: needsAttention,
                     width: notchSize.width + openedPad * 2,
                     height: closedNotchSize.height
                 )
@@ -333,6 +339,7 @@ struct NotchView: View {
                 TurtleSceneView(
                     emotion: primaryEmotion,
                     isProcessing: isProcessing,
+                    needsAttention: needsAttention,
                     width: closedExpandedWidth + closedPad * 2,
                     height: closedNotchSize.height
                 )

@@ -407,6 +407,7 @@ class TurtleSceneState: ObservableObject {
 struct TurtleSceneView: View {
     var emotion: CrabEmotion = .neutral
     var isProcessing: Bool = false
+    var needsAttention: Bool = false
     let width: CGFloat
     let height: CGFloat
 
@@ -420,6 +421,7 @@ struct TurtleSceneView: View {
     private let sleepThreshold: TimeInterval = 180
 
     private var bobAmplitude: CGFloat {
+        if needsAttention { return 5.0 }  // exaggerated bounce to grab attention
         if s.isSleeping { return 0.3 }
         switch emotion {
         case .neutral: return 1.2
@@ -433,6 +435,7 @@ struct TurtleSceneView: View {
     }
 
     private var bobSpeed: Double {
+        if needsAttention { return 0.25 }  // rapid bounce when needs attention
         if s.isSleeping { return 3.0 }
         return isProcessing ? 0.6 : 1.5
     }
@@ -1162,24 +1165,31 @@ struct TurtleSceneView: View {
                 }
             }
 
-            // Thought bubble above Sheldon for confused/excited/curious
-            if emotion == .confused || emotion == .excited || emotion == .curious {
-                let symbol = emotion == .confused ? "?" : (emotion == .excited ? "!" : "...")
+            // Thought bubble above Sheldon
+            if needsAttention || emotion == .confused || emotion == .excited || emotion == .curious {
+                let symbol: String = {
+                    if needsAttention { return "!" }
+                    if emotion == .confused { return "?" }
+                    if emotion == .excited { return "!" }
+                    return "..."
+                }()
+                let bubbleColor: Color = needsAttention ? .orange : (emotion == .excited ? .yellow : .white)
                 Text(symbol)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(emotion == .excited ? .yellow : .white)
+                    .font(.system(size: needsAttention ? 12 : 10, weight: .bold, design: .rounded))
+                    .foregroundColor(bubbleColor)
                     .padding(.horizontal, 3)
                     .padding(.vertical, 1)
                     .background(
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.black.opacity(0.5))
+                            .fill(needsAttention ? Color.orange.opacity(0.3) : Color.black.opacity(0.5))
                     )
                     .offset(
                         x: s.walkX * width + 10,
-                        y: -(height * 0.65) + CGFloat(sin(s.timePhase * 2) * 2)
+                        y: -(height * 0.65) + CGFloat(sin(s.timePhase * (needsAttention ? 4 : 2)) * (needsAttention ? 3 : 2))
                     )
                     .transition(.scale.combined(with: .opacity))
                     .animation(.easeInOut(duration: 0.5), value: emotion)
+                    .animation(.easeInOut(duration: 0.3), value: needsAttention)
             }
     }
 
@@ -1399,6 +1409,19 @@ struct TurtleSceneView: View {
             if s.showRainbow {
                 s.rainbowOpacity = max(0, s.rainbowOpacity - 0.002)
                 if s.rainbowOpacity <= 0 { s.showRainbow = false }
+            }
+
+            // Attention state: stop walking, look up at user
+            if needsAttention {
+                if s.isSleeping {
+                    withAnimation(.easeInOut(duration: 0.3)) { s.isSleeping = false }
+                }
+                s.isWalking = false
+                s.lookingUp = true
+                return
+            } else if !needsAttention && s.lookingUp {
+                // Clear the forced look-up when attention clears
+                s.lookingUp = false
             }
 
             // Walking logic -- only walks when Claude is processing and not eating
