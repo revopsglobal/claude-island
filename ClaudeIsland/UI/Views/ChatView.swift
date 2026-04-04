@@ -421,24 +421,46 @@ struct ChatView: View {
 
     /// Bar for interactive tools like AskUserQuestion -- answer directly from the app
     private var interactivePromptBar: some View {
-        ChatInteractivePromptBar(
+        // Capture option count for "Type something." index calculation
+        let optionCount = session.activePermission?.parsedQuestions?.first?.options.count ?? 0
+
+        return ChatInteractivePromptBar(
             parsedQuestions: session.activePermission?.parsedQuestions,
             questionText: session.activePermission?.questionText,
             canSend: canSendMessages,
-            onSend: { answer in
-                // First approve the permission (unblocks the hook, allows the tool to run)
-                approvePermission()
-                // Then send the answer to the terminal after the tool shows its prompt
+            onSend: { answer, pickerIndex in
+                // Passthrough: tell the hook to exit without a decision so Claude Code
+                // shows its interactive picker in the terminal
+                passthroughPermission()
+
                 Task {
-                    try? await Task.sleep(for: .milliseconds(800))
-                    await sendToSession(answer)
+                    // Wait for the picker to render in the terminal
+                    try? await Task.sleep(for: .milliseconds(1200))
+
+                    guard let target = await findTmuxTargetForSession() else { return }
+
+                    if let index = pickerIndex {
+                        // User clicked an option chip -- arrow down to it and press Enter
+                        _ = await ToolApprovalHandler.shared.selectPickerOption(
+                            index: index,
+                            target: target
+                        )
+                    } else {
+                        // User typed custom text -- select "Type something." then type it
+                        _ = await ToolApprovalHandler.shared.selectPickerCustom(
+                            typeOptionIndex: optionCount,
+                            text: answer,
+                            target: target
+                        )
+                    }
                 }
             },
             onDismiss: {
                 denyPermission()
             },
             onGoToTerminal: {
-                approvePermission()
+                // Passthrough so the picker appears in terminal for manual answer
+                passthroughPermission()
                 focusTerminal()
             }
         )
@@ -475,8 +497,18 @@ struct ChatView: View {
         sessionMonitor.approvePermission(sessionId: sessionId)
     }
 
+    private func passthroughPermission() {
+        sessionMonitor.passthroughPermission(sessionId: sessionId)
+    }
+
     private func denyPermission() {
         sessionMonitor.denyPermission(sessionId: sessionId, reason: nil)
+    }
+
+    /// Find the tmux target for the current session's TTY
+    private func findTmuxTargetForSession() async -> TmuxTarget? {
+        guard session.isInTmux, let tty = session.tty else { return nil }
+        return await findTmuxTarget(tty: tty)
     }
 
     private func sendMessage() {
@@ -1003,7 +1035,9 @@ struct ChatInteractivePromptBar: View {
     let parsedQuestions: [PermissionContext.ParsedQuestion]?
     let questionText: String?
     let canSend: Bool
-    let onSend: (String) -> Void
+    /// Called when the user picks an option or types custom text.
+    /// pickerIndex: 0-based index in Claude's interactive picker (nil = custom "Other" text)
+    let onSend: (_ answer: String, _ pickerIndex: Int?) -> Void
     let onDismiss: () -> Void
     let onGoToTerminal: () -> Void
 
@@ -1066,11 +1100,11 @@ struct ChatInteractivePromptBar: View {
             // Option chips
             if let q = firstQuestion, !q.options.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(q.options.enumerated()), id: \.offset) { _, option in
+                    ForEach(Array(q.options.enumerated()), id: \.offset) { index, option in
                         Button {
                             selectedOption = option.label
                             if canSend {
-                                onSend(option.label)
+                                onSend(option.label, index)
                             } else {
                                 onGoToTerminal()
                             }
@@ -1204,7 +1238,7 @@ struct ChatInteractivePromptBar: View {
         let text = otherText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, canSend else { return }
         otherText = ""
-        onSend(text)
+        onSend(text, nil)
     }
 }
 
