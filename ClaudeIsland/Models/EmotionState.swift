@@ -39,10 +39,10 @@ final class EmotionState {
     static let excitedThreshold = 0.40
     static let confusedThreshold = 0.30
     static let intensityDampen = 0.85
-    static let decayRate = 0.92
-    static let interEmotionDecay = 0.9
-    static let neutralCounterDecay = 0.85
-    static let decayIntervalSeconds: TimeInterval = 60
+    static let decayRate = 0.78          // was 0.92: emotions now fade noticeably each tick
+    static let interEmotionDecay = 0.85  // was 0.9: competing emotions fade slightly faster
+    static let neutralCounterDecay = 0.80 // was 0.85: neutral prompts cool down emotions faster
+    static let decayIntervalSeconds: TimeInterval = 20  // was 60: tick every 20s instead of 60s
 
     init() {}
 
