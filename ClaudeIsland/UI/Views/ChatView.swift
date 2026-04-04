@@ -24,9 +24,6 @@ struct ChatView: View {
     @State private var newMessageCount: Int = 0
     @State private var previousHistoryCount: Int = 0
     @State private var isBottomVisible: Bool = true
-    @State private var approvalVisible: Bool = false
-    @State private var approvalDebounceTask: Task<Void, Never>? = nil
-    @State private var approvalEnteredAt: Date? = nil
     @FocusState private var isInputFocused: Bool
 
     init(sessionId: String, initialSession: SessionState, sessionMonitor: ClaudeSessionMonitor, viewModel: NotchViewModel) {
@@ -44,19 +41,15 @@ struct ChatView: View {
         self._hasLoadedOnce = State(initialValue: alreadyLoaded)
     }
 
-    /// Whether we're waiting for approval (debounced to filter auto-approvals)
+    /// Whether we're waiting for approval
     private var isWaitingForApproval: Bool {
-        approvalVisible
+        session.phase.isWaitingForApproval
     }
 
-    /// Extract the tool name if waiting for approval (debounced)
+    /// Extract the tool name if waiting for approval
     private var approvalTool: String? {
-        guard approvalVisible else { return nil }
-        return session.phase.approvalToolName
+        session.phase.approvalToolName
     }
-
-    /// Debounce threshold for showing approval UI (filters auto-approved tool flashes)
-    private static let approvalDebounceSeconds: TimeInterval = 2.5
 
     
     var body: some View {
@@ -165,9 +158,6 @@ struct ChatView: View {
                     }
                 }
             }
-        }
-        .onChange(of: session.phase.isWaitingForApproval) { _, isWaiting in
-            handleApprovalDebounce(isWaiting: isWaiting)
         }
         .onChange(of: canSendMessages) { _, canSend in
             // Auto-focus input when tmux messaging becomes available
@@ -467,44 +457,6 @@ struct ChatView: View {
         isAutoscrollPaused = false
         newMessageCount = 0
         previousHistoryCount = history.count
-    }
-
-    // MARK: - Approval Debounce
-
-    /// Debounce the approval UI to filter auto-approved tool flashes
-    private func handleApprovalDebounce(isWaiting: Bool) {
-        if !isWaiting {
-            // Permission cleared: immediately hide and cancel timer
-            approvalDebounceTask?.cancel()
-            approvalDebounceTask = nil
-            approvalEnteredAt = nil
-            if approvalVisible {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    approvalVisible = false
-                }
-            }
-            return
-        }
-
-        // Permission just became pending
-        let now = Date()
-        if approvalEnteredAt == nil {
-            approvalEnteredAt = now
-        }
-
-        // Schedule showing after debounce threshold
-        approvalDebounceTask?.cancel()
-        approvalDebounceTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(Self.approvalDebounceSeconds))
-            guard !Task.isCancelled else { return }
-            // Re-check that permission is still pending
-            if session.phase.isWaitingForApproval {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    approvalVisible = true
-                }
-            }
-            approvalDebounceTask = nil
-        }
     }
 
     // MARK: - Actions
