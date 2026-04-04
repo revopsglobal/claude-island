@@ -16,7 +16,7 @@ private let logger = Logger(subsystem: "com.claudeisland", category: "EmotionAna
 final class EmotionAnalyzer {
     static let shared = EmotionAnalyzer()
 
-    nonisolated private static let validEmotions: Set<String> = ["happy", "sad", "neutral"]
+    nonisolated private static let validEmotions: Set<String> = ["happy", "sad", "neutral", "curious", "excited", "confused"]
     private var apiKey: String?
 
     private init() {
@@ -44,10 +44,13 @@ final class EmotionAnalyzer {
 
         let systemPrompt = """
         Classify the emotional tone of this user message into exactly one emotion and intensity score.
-        Emotions: happy, sad, neutral.
-        Happy: explicit praise, gratitude, celebration, positive profanity.
+        Emotions: happy, sad, neutral, curious, excited, confused.
+        Happy: praise, gratitude, celebration, positive profanity.
         Sad: frustration, anger, insults, complaints, disappointment, negative profanity.
-        Neutral: instructions, requests, questions, task descriptions. Most coding instructions are neutral.
+        Curious: exploration, "what if", "how does", investigating, learning, researching.
+        Excited: breakthroughs, "YES!", amazement, "this is amazing", "holy shit it works", celebration of progress.
+        Confused: "why is this broken", "I don't understand", debugging frustration, "what the hell", error reports.
+        Neutral: plain instructions, requests, task descriptions. Most coding instructions are neutral.
         Intensity: 0.0 to 1.0. ALL CAPS increases intensity by 0.2-0.3.
         Reply with ONLY valid JSON: {"emotion": "...", "intensity": ...}
         """
@@ -99,7 +102,7 @@ final class EmotionAnalyzer {
            let intensity = parsed["intensity"] as? Double {
             let validEmotion = Self.validEmotions.contains(emotion) ? emotion : "neutral"
             let clampedIntensity = min(max(intensity, 0.0), 1.0)
-            logger.info("[Emotion API] \(validEmotion) (\(String(format: "%.2f", clampedIntensity)))")
+            logger.info("[Emotion API] \(validEmotion, privacy: .public) (\(String(format: "%.2f", clampedIntensity), privacy: .public))")
             return (validEmotion, clampedIntensity)
         }
 

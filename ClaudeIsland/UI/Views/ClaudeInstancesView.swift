@@ -300,6 +300,9 @@ struct InstanceRow: View {
         case .happy: return Color(red: 0.95, green: 0.55, blue: 0.25)
         case .sad: return Color(red: 0.65, green: 0.45, blue: 0.50)
         case .sob: return Color(red: 0.55, green: 0.40, blue: 0.50)
+        case .curious: return Color(red: 0.40, green: 0.65, blue: 0.85)
+        case .excited: return Color(red: 1.00, green: 0.70, blue: 0.20)
+        case .confused: return Color(red: 0.70, green: 0.50, blue: 0.70)
         }
     }
 

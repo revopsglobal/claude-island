@@ -61,6 +61,9 @@ struct ClaudeTurtleIcon: View {
         case .happy: return Color(red: 0.50, green: 0.82, blue: 0.35)
         case .sad: return Color(red: 0.40, green: 0.52, blue: 0.48)
         case .sob: return Color(red: 0.35, green: 0.45, blue: 0.45)
+        case .curious: return Color(red: 0.40, green: 0.60, blue: 0.75)   // blue-tinted
+        case .excited: return Color(red: 0.80, green: 0.65, blue: 0.20)   // golden
+        case .confused: return Color(red: 0.65, green: 0.55, blue: 0.65)  // purple-grey
         }
     }
 
@@ -70,6 +73,9 @@ struct ClaudeTurtleIcon: View {
         case .happy: return Color(red: 0.72, green: 0.92, blue: 0.42)
         case .sad: return Color(red: 0.55, green: 0.65, blue: 0.52)
         case .sob: return Color(red: 0.48, green: 0.58, blue: 0.48)
+        case .curious: return Color(red: 0.55, green: 0.78, blue: 0.65)
+        case .excited: return Color(red: 0.85, green: 0.80, blue: 0.40)
+        case .confused: return Color(red: 0.70, green: 0.65, blue: 0.72)
         }
     }
 
@@ -79,6 +85,9 @@ struct ClaudeTurtleIcon: View {
         case .happy: return Color(red: 0.40, green: 0.65, blue: 0.28)
         case .sad: return Color(red: 0.32, green: 0.42, blue: 0.38)
         case .sob: return Color(red: 0.28, green: 0.38, blue: 0.35)
+        case .curious: return Color(red: 0.30, green: 0.48, blue: 0.62)
+        case .excited: return Color(red: 0.65, green: 0.52, blue: 0.15)
+        case .confused: return Color(red: 0.52, green: 0.42, blue: 0.52)
         }
     }
 
@@ -163,11 +172,56 @@ struct ClaudeTurtleIcon: View {
                     case .neutral:
                         rect(50 + headX, 22, 3, 3, color: eyeColor)
                     case .happy:
-                        rect(50 + headX, 24, 3, 2, color: eyeColor)
+                        // Squinty happy eyes (curved up)
+                        rect(50 + headX, 23, 4, 2, color: eyeColor)
+                        rect(51 + headX, 22, 2, 1, color: skinColor) // top curve
                     case .sad:
+                        // Droopy sad eyes
                         rect(50 + headX, 23, 3, 4, color: eyeColor)
+                        // Sad eyebrow (angled down toward face)
+                        rect(49 + headX, 20, 5, 1.5, color: eyeColor)
                     case .sob:
+                        // Wide distressed eyes
                         rect(49 + headX, 21, 4, 5, color: eyeColor)
+                        // Anguished eyebrows (steep angle)
+                        rect(48 + headX, 18, 6, 1.5, color: eyeColor)
+                        rect(49 + headX, 19, 4, 1, color: eyeColor)
+                    case .curious:
+                        // Wide eye looking up-right (inquisitive)
+                        rect(50 + headX, 20, 4, 4, color: eyeColor)
+                        rect(51 + headX, 20, 2, 2, color: .white) // highlight (looking up)
+                        // Raised eyebrow
+                        rect(49 + headX, 17, 5, 1.5, color: eyeColor)
+                    case .excited:
+                        // Star-like eyes (sparkle)
+                        rect(50 + headX, 22, 4, 4, color: eyeColor)
+                        rect(51 + headX, 21, 2, 1, color: Color.yellow) // top sparkle
+                        rect(51 + headX, 25, 2, 1, color: Color.yellow) // bottom sparkle
+                        rect(50 + headX, 23, 1, 2, color: Color.yellow) // left sparkle
+                        rect(53 + headX, 23, 1, 2, color: Color.yellow) // right sparkle
+                    case .confused:
+                        // Uneven eyes (one squinted, one wide)
+                        rect(50 + headX, 22, 4, 4, color: eyeColor) // wide eye
+                        // Tilted eyebrow (one up, one down)
+                        rect(49 + headX, 19, 3, 1.5, color: eyeColor)  // left brow up
+                        rect(53 + headX, 21, 3, 1.5, color: eyeColor)  // right brow down
+                    }
+                }
+
+                // -- TEARS (sad/sob) --
+                if !isSleeping && !isBlinking {
+                    let tearColor = Color(red: 0.5, green: 0.65, blue: 1.0)
+                    if emotion == .sob {
+                        // Streaming tears: two tear tracks down the face
+                        rect(50 + headX, 26, 2, 3, color: tearColor.opacity(0.9))
+                        rect(50 + headX, 30, 2, 4, color: tearColor.opacity(0.7))
+                        rect(50 + headX, 35, 2, 3, color: tearColor.opacity(0.5))
+                        rect(53 + headX, 27, 2, 3, color: tearColor.opacity(0.9))
+                        rect(53 + headX, 31, 2, 4, color: tearColor.opacity(0.7))
+                    } else if emotion == .sad {
+                        // Single tear drop rolling down
+                        rect(51 + headX, 27, 2, 3, color: tearColor.opacity(0.8))
+                        rect(51 + headX, 31, 2, 2, color: tearColor.opacity(0.5))
                     }
                 }
 
@@ -178,9 +232,29 @@ struct ClaudeTurtleIcon: View {
                 } else if !isSleeping {
                     switch emotion {
                     case .happy:
-                        rect(51 + headX, 28, 4, 2, color: eyeColor)
-                    case .sad, .sob:
+                        // Smile: wider, curved up
+                        rect(50 + headX, 28, 6, 2, color: eyeColor)
+                        rect(51 + headX, 27, 4, 1, color: skinColor)  // cut top for curve
+                    case .sad:
+                        // Frown: downturned mouth
                         rect(51 + headX, 30, 4, 2, color: eyeColor)
+                    case .sob:
+                        // Open wailing mouth
+                        rect(50 + headX, 29, 6, 5, color: eyeColor)
+                        rect(51 + headX, 30, 4, 3, color: Color(red: 0.5, green: 0.15, blue: 0.1))
+                    case .curious:
+                        // Small "o" mouth (inquisitive)
+                        rect(52 + headX, 28, 3, 3, color: eyeColor)
+                        rect(53 + headX, 29, 1, 1, color: skinColor)
+                    case .excited:
+                        // Big open grin
+                        rect(49 + headX, 27, 7, 3, color: eyeColor)
+                        rect(50 + headX, 28, 5, 1, color: .white) // teeth
+                    case .confused:
+                        // Squiggly/wavy mouth
+                        rect(50 + headX, 29, 2, 2, color: eyeColor)
+                        rect(52 + headX, 30, 2, 2, color: eyeColor)
+                        rect(54 + headX, 29, 2, 2, color: eyeColor)
                     default:
                         break
                     }
@@ -352,6 +426,9 @@ struct TurtleSceneView: View {
         case .happy: return 2.0
         case .sad: return 0.4
         case .sob: return 0
+        case .curious: return 1.5      // alert, slightly bouncy
+        case .excited: return 3.0       // very bouncy
+        case .confused: return 0.6      // subdued, hesitant
         }
     }
 
@@ -367,6 +444,9 @@ struct TurtleSceneView: View {
         case .happy: return 1.5
         case .sad: return 0.2
         case .sob: return 0.1
+        case .curious: return 0.8       // slight head-tilt feel
+        case .excited: return 2.0       // wiggly excitement
+        case .confused: return 1.0      // wobbling uncertainty
         }
     }
 
@@ -388,25 +468,43 @@ struct TurtleSceneView: View {
 
 
     // Grass colors adjusted for time of day and emotion
+    // When sad/sob, shift grass toward desaturated blue-grey
     private var grassDark: Color {
         let dim = s.grassDimFactor
-        return Color(red: 0.18 * daylight * dim, green: 0.32 * daylight * dim, blue: 0.15 * daylight * dim)
+        let sadShift = 1.0 - dim  // how much to shift toward grey
+        let r = (0.18 * dim + 0.15 * sadShift) * daylight
+        let g = (0.32 * dim + 0.15 * sadShift) * daylight
+        let b = (0.15 * dim + 0.20 * sadShift) * daylight
+        return Color(red: r, green: g, blue: b)
     }
     private var grassLight: Color {
         let dim = s.grassDimFactor
-        return Color(red: 0.25 * daylight * dim, green: 0.42 * daylight * dim, blue: 0.20 * daylight * dim)
+        let sadShift = 1.0 - dim
+        let r = (0.25 * dim + 0.18 * sadShift) * daylight
+        let g = (0.42 * dim + 0.18 * sadShift) * daylight
+        let b = (0.20 * dim + 0.25 * sadShift) * daylight
+        return Color(red: r, green: g, blue: b)
     }
     private var grassHighlight: Color {
         let dim = s.grassDimFactor
-        return Color(red: 0.30 * daylight * dim, green: 0.50 * daylight * dim, blue: 0.22 * daylight * dim)
+        let sadShift = 1.0 - dim
+        let r = (0.30 * dim + 0.20 * sadShift) * daylight
+        let g = (0.50 * dim + 0.20 * sadShift) * daylight
+        let b = (0.22 * dim + 0.28 * sadShift) * daylight
+        return Color(red: r, green: g, blue: b)
     }
     private var dirtColor: Color {
         let dim = s.grassDimFactor
-        return Color(red: 0.22 * daylight * dim, green: 0.18 * daylight * dim, blue: 0.12 * daylight * dim)
+        let sadShift = 1.0 - dim
+        let r = (0.22 * dim + 0.12 * sadShift) * daylight
+        let g = (0.18 * dim + 0.12 * sadShift) * daylight
+        let b = (0.12 * dim + 0.15 * sadShift) * daylight
+        return Color(red: r, green: g, blue: b)
     }
     private var skyColor: Color {
         if s.cloudOpacity > 0 {
-            return Color(red: 0.05, green: 0.05, blue: 0.12).opacity(s.cloudOpacity)
+            // Much darker, more visible storm sky
+            return Color(red: 0.02, green: 0.02, blue: 0.08).opacity(s.cloudOpacity)
         }
         return isNighttime ? Color(red: 0.02, green: 0.02, blue: 0.08) : .clear
     }
@@ -444,6 +542,68 @@ struct TurtleSceneView: View {
     // MARK: - Sub-views (broken out to help the type checker)
 
     @ViewBuilder
+    // Sky color based on emotion -- painted as full background
+    private var emotionSkyColor: Color {
+        switch emotion {
+        case .happy:
+            return Color(red: 0.95, green: 0.80, blue: 0.35)  // warm golden yellow
+        case .sad:
+            return Color(red: 0.15, green: 0.18, blue: 0.30)  // dark slate blue
+        case .sob:
+            return Color(red: 0.06, green: 0.06, blue: 0.12)  // near-black storm
+        case .curious:
+            return Color(red: 0.40, green: 0.65, blue: 0.90)  // deeper curious blue
+        case .excited:
+            return Color(red: 1.00, green: 0.70, blue: 0.30)  // bright sunset orange
+        case .confused:
+            return Color(red: 0.45, green: 0.35, blue: 0.60)  // hazy purple
+        default:
+            if isNighttime {
+                return Color(red: 0.05, green: 0.05, blue: 0.15)
+            }
+            return Color(red: 0.55, green: 0.78, blue: 0.95)  // bright sky blue
+        }
+    }
+
+    // Grass base color shifts entirely per emotion
+    private var emotionGrassDark: Color {
+        switch emotion {
+        case .happy:
+            return Color(red: 0.15 * daylight, green: 0.45 * daylight, blue: 0.10 * daylight)
+        case .sad:
+            return Color(red: 0.12, green: 0.18, blue: 0.15)
+        case .sob:
+            return Color(red: 0.08, green: 0.10, blue: 0.10)
+        case .curious:
+            return Color(red: 0.12 * daylight, green: 0.35 * daylight, blue: 0.18 * daylight)
+        case .excited:
+            return Color(red: 0.20 * daylight, green: 0.48 * daylight, blue: 0.08 * daylight)
+        case .confused:
+            return Color(red: 0.18, green: 0.15, blue: 0.22)
+        default:
+            return grassDark
+        }
+    }
+
+    private var emotionGrassLight: Color {
+        switch emotion {
+        case .happy:
+            return Color(red: 0.20 * daylight, green: 0.55 * daylight, blue: 0.15 * daylight)
+        case .sad:
+            return Color(red: 0.15, green: 0.22, blue: 0.18)
+        case .sob:
+            return Color(red: 0.10, green: 0.12, blue: 0.12)
+        case .curious:
+            return Color(red: 0.16 * daylight, green: 0.42 * daylight, blue: 0.22 * daylight)
+        case .excited:
+            return Color(red: 0.25 * daylight, green: 0.58 * daylight, blue: 0.12 * daylight)
+        case .confused:
+            return Color(red: 0.22, green: 0.18, blue: 0.28)
+        default:
+            return grassLight
+        }
+    }
+
     private var grassCanvas: some View {
         Canvas { context, canvasSize in
                 let w = canvasSize.width
@@ -467,7 +627,7 @@ struct TurtleSceneView: View {
                     p.addLine(to: CGPoint(x: 0, y: h))
                     p.closeSubpath()
                 }
-                context.fill(grass, with: .color(grassDark))
+                context.fill(grass, with: .color(emotionGrassDark))
 
                 // Grass tufts
                 for i in stride(from: CGFloat(3), to: w, by: 8) {
@@ -475,12 +635,12 @@ struct TurtleSceneView: View {
                     let tuft = Path { p in
                         p.addRect(CGRect(x: i, y: tuftY, width: 2, height: 4))
                     }
-                    let c = Int(i) % 16 < 8 ? grassLight : grassHighlight
+                    let c = Int(i) % 16 < 8 ? emotionGrassLight : grassHighlight
                     context.fill(tuft, with: .color(c))
                 }
 
-                // Stars/fireflies at night
-                if isNighttime {
+                // Stars/fireflies at night (only when neutral)
+                if isNighttime && emotion == .neutral {
                     for i in 0 ..< 6 {
                         let sx = CGFloat(i) * w / 6.0 + sin(s.timePhase * 0.5 + Double(i)) * 3
                         let sy = CGFloat(3 + (i % 3) * 5) + sin(s.timePhase * 0.3 + Double(i) * 2) * 2
@@ -492,17 +652,28 @@ struct TurtleSceneView: View {
                     }
                 }
 
-                // Raindrops (when sad/sob)
+                // Raindrops -- thick, bright, unmissable
                 if emotion == .sad || emotion == .sob {
+                    let rainOpacity = emotion == .sob ? 0.9 : 0.7
+                    let rainWidth: CGFloat = emotion == .sob ? 1.5 : 1.0
+                    let rainHeight: CGFloat = emotion == .sob ? 6 : 4
                     for drop in s.raindrops {
                         let raindrop = Path { p in
-                            p.addRect(CGRect(x: drop.x, y: drop.y, width: 1, height: 3))
+                            p.addRect(CGRect(x: drop.x, y: drop.y, width: rainWidth, height: rainHeight))
                         }
-                        context.fill(raindrop, with: .color(Color(red: 0.5, green: 0.6, blue: 0.8).opacity(0.6)))
+                        context.fill(raindrop, with: .color(Color(red: 0.6, green: 0.7, blue: 1.0).opacity(rainOpacity)))
                     }
                 }
-            }
 
+                // Lightning flash for sob (random brief white flash)
+                if emotion == .sob && Int.random(in: 0 ..< 40) == 0 {
+                    let flash = Path { p in
+                        p.addRect(CGRect(x: 0, y: 0, width: w, height: h))
+                    }
+                    context.fill(flash, with: .color(Color.white.opacity(0.3)))
+                }
+            }
+            .id(emotion)  // Force Canvas re-render when emotion changes
     }
 
     @ViewBuilder
@@ -761,6 +932,24 @@ struct TurtleSceneView: View {
                     .allowsHitTesting(false)
             }
 
+            // Warm golden glow when happy (visible tint shift)
+            if emotion == .happy {
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.85, blue: 0.3).opacity(0.15),
+                                Color(red: 1.0, green: 0.7, blue: 0.2).opacity(0.08),
+                                Color.clear
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: width, height: height)
+                    .allowsHitTesting(false)
+            }
+
             // Sparkles (golden glitter when happy)
             ForEach(0 ..< s.sparkles.count, id: \.self) { i in
                 let sp = s.sparkles[i]
@@ -830,18 +1019,27 @@ struct TurtleSceneView: View {
 
             // Cloud cover overlay (darkens sky when sad/sob)
             if s.cloudOpacity > 0.05 {
+                // Full-scene dark overlay for dramatic effect
+                Rectangle()
+                    .fill(Color(red: 0.03, green: 0.03, blue: 0.08).opacity(s.cloudOpacity * 0.7))
+                    .frame(width: width, height: height)
+                    .allowsHitTesting(false)
+
+                // Cloud blobs on top
                 Canvas { context, canvasSize in
                     let w = canvasSize.width
-                    // Draw 4-5 overlapping cloud blobs across the top
-                    let cloudY: CGFloat = 4
-                    for cx in stride(from: CGFloat(-10), through: w + 10, by: 25) {
-                        let c1 = Path { p in p.addEllipse(in: CGRect(x: cx - 12, y: cloudY - 3, width: 24, height: 8)) }
-                        let c2 = Path { p in p.addEllipse(in: CGRect(x: cx - 8, y: cloudY - 5, width: 16, height: 7)) }
-                        let c3 = Path { p in p.addEllipse(in: CGRect(x: cx - 5, y: cloudY - 1, width: 20, height: 6)) }
-                        let color = Color(red: 0.2, green: 0.2, blue: 0.25).opacity(s.cloudOpacity * 0.6)
+                    let h = canvasSize.height
+                    // Dense overlapping clouds across the top third
+                    for cx in stride(from: CGFloat(-15), through: w + 15, by: 18) {
+                        let c1 = Path { p in p.addEllipse(in: CGRect(x: cx - 15, y: 0, width: 30, height: 12)) }
+                        let c2 = Path { p in p.addEllipse(in: CGRect(x: cx - 10, y: -3, width: 20, height: 10)) }
+                        let c3 = Path { p in p.addEllipse(in: CGRect(x: cx - 8, y: 4, width: 25, height: 9)) }
+                        let c4 = Path { p in p.addEllipse(in: CGRect(x: cx - 5, y: h * 0.15, width: 22, height: 8)) }
+                        let color = Color(red: 0.15, green: 0.15, blue: 0.2).opacity(s.cloudOpacity * 0.8)
                         context.fill(c1, with: .color(color))
                         context.fill(c2, with: .color(color))
                         context.fill(c3, with: .color(color))
+                        context.fill(c4, with: .color(color))
                     }
                 }
                 .frame(width: width, height: height)
@@ -954,7 +1152,7 @@ struct TurtleSceneView: View {
             )
             .rotationEffect(.degrees(s.swayAngle * swayDeg + s.spinAngle), anchor: .bottom)
             .onTapGesture {
-                // Click turtle → spin!
+                // Click turtle -- spin!
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.4)) {
                     s.spinAngle += 360
                 }
@@ -963,10 +1161,33 @@ struct TurtleSceneView: View {
                     withAnimation(.easeOut(duration: 0.2)) { s.spinAngle = 0 }
                 }
             }
+
+            // Thought bubble above Sheldon for confused/excited/curious
+            if emotion == .confused || emotion == .excited || emotion == .curious {
+                let symbol = emotion == .confused ? "?" : (emotion == .excited ? "!" : "...")
+                Text(symbol)
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(emotion == .excited ? .yellow : .white)
+                    .padding(.horizontal, 3)
+                    .padding(.vertical, 1)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.black.opacity(0.5))
+                    )
+                    .offset(
+                        x: s.walkX * width + 10,
+                        y: -(height * 0.65) + CGFloat(sin(s.timePhase * 2) * 2)
+                    )
+                    .transition(.scale.combined(with: .opacity))
+                    .animation(.easeInOut(duration: 0.5), value: emotion)
+            }
     }
 
     var body: some View {
         ZStack(alignment: .bottom) {
+            // Sky fills entire frame as background -- no black gaps at edges
+            Rectangle()
+                .fill(emotionSkyColor)
             grassCanvas
             natureOverlay
             flowerAndTurtle
@@ -1134,17 +1355,36 @@ struct TurtleSceneView: View {
                 }
             }
 
-            // Cloud opacity transition (smooth)
-            let targetCloud: Double = (emotion == .sad || emotion == .sob) ? (emotion == .sob ? 0.8 : 0.5) : 0
-            s.cloudOpacity += (targetCloud - s.cloudOpacity) * 0.02
+            // Cloud opacity transition -- fast and dramatic
+            let targetCloud: Double
+            switch emotion {
+            case .sob: targetCloud = 1.0
+            case .sad: targetCloud = 0.7
+            case .confused: targetCloud = 0.4  // hazy fog
+            default: targetCloud = 0
+            }
+            s.cloudOpacity += (targetCloud - s.cloudOpacity) * 0.08
 
-            // Grass dim transition (smooth)
-            let targetDim: Double = emotion == .sob ? 0.5 : (emotion == .sad ? 0.7 : 1.0)
-            s.grassDimFactor += (targetDim - s.grassDimFactor) * 0.02
+            // Grass dim transition -- dramatic desaturation when sad
+            let targetDim: Double
+            switch emotion {
+            case .sob: targetDim = 0.2
+            case .sad: targetDim = 0.4
+            case .confused: targetDim = 0.6
+            default: targetDim = 1.0
+            }
+            s.grassDimFactor += (targetDim - s.grassDimFactor) * 0.08
 
             // Flower bloom scale transition
-            let targetBloom: CGFloat = emotion == .happy ? 1.4 : (emotion == .sad || emotion == .sob ? 0.7 : 1.0)
-            s.flowerBloomScale += (targetBloom - s.flowerBloomScale) * 0.03
+            let targetBloom: CGFloat
+            switch emotion {
+            case .happy: targetBloom = 1.8
+            case .excited: targetBloom = 2.0  // extra bloom
+            case .sad, .sob: targetBloom = 0.3
+            case .confused: targetBloom = 0.5
+            default: targetBloom = 1.0
+            }
+            s.flowerBloomScale += (targetBloom - s.flowerBloomScale) * 0.06
 
             // Music notes (float up and fade)
             for i in (0 ..< s.musicNotes.count).reversed() {
@@ -1184,10 +1424,10 @@ struct TurtleSceneView: View {
                     }
                     return
                 }
-                // Arrived at resting spot -- face away from notch
+                // Arrived at resting spot -- face toward center (away from nearest edge)
                 s.walkX = restTarget
                 s.isWalking = false
-                s.facingRight = restTarget > 0  // right side faces right, left side faces left
+                s.facingRight = restTarget < 0  // left side faces right (center), right side faces left (center)
                 return
             }
             guard now > s.walkPauseUntil else { return }
@@ -1259,47 +1499,53 @@ struct TurtleSceneView: View {
                 }
             }
 
-            // Hearts when happy (more frequent, from multiple positions)
+            // Hearts when happy -- lots of them, spread across the scene
             if emotion == .happy && !s.isSleeping {
-                // Spawn 1-2 hearts per tick (was 25% chance of 1)
-                if Int.random(in: 0 ..< 2) == 0 {
+                // Spawn hearts every tick from multiple positions
+                s.hearts.append((
+                    x: CGFloat(s.walkX) + 0.5 + CGFloat.random(in: -0.08 ... 0.08),
+                    y: 0.55 + CGFloat.random(in: -0.05 ... 0.05),
+                    opacity: 1.0,
+                    age: 0
+                ))
+                // Also spawn hearts from random scene positions
+                if Int.random(in: 0 ..< 3) == 0 {
                     s.hearts.append((
-                        x: CGFloat(s.walkX) + 0.5 + CGFloat.random(in: -0.05 ... 0.05),
-                        y: 0.55 + CGFloat.random(in: -0.05 ... 0.05),
-                        opacity: 1.0,
+                        x: CGFloat.random(in: 0.15 ... 0.85),
+                        y: CGFloat.random(in: 0.4 ... 0.7),
+                        opacity: 0.8,
                         age: 0
                     ))
                 }
-                // Cap at 8 hearts (was 5)
-                if s.hearts.count > 8 { s.hearts.removeFirst() }
+                if s.hearts.count > 15 { s.hearts.removeFirst() }
 
-                // Sparkles around the scene when happy
-                if s.sparkles.count < 10 && Int.random(in: 0 ..< 3) == 0 {
+                // Dense sparkles across entire scene when happy
+                if s.sparkles.count < 20 {
                     s.sparkles.append((
-                        x: CGFloat.random(in: 0.1 ... 0.9),
-                        y: CGFloat.random(in: 0.15 ... 0.55),
-                        opacity: 0.9,
-                        size: CGFloat.random(in: 2.0 ... 4.0)
+                        x: CGFloat.random(in: 0.05 ... 0.95),
+                        y: CGFloat.random(in: 0.1 ... 0.6),
+                        opacity: 1.0,
+                        size: CGFloat.random(in: 2.5 ... 5.0)
                     ))
                 }
             } else if emotion != .happy {
-                // Clear sparkles when not happy
-                if !s.sparkles.isEmpty && Int.random(in: 0 ..< 4) == 0 {
+                // Clear sparkles quickly when not happy
+                if !s.sparkles.isEmpty {
                     s.sparkles.removeFirst()
                 }
             }
 
-            // Rain management (heavier when sob)
-            if emotion == .sad && s.raindrops.count < 25 {
-                for _ in 0 ..< 4 {
+            // Rain management -- heavy and visible
+            if emotion == .sad && s.raindrops.count < 50 {
+                for _ in 0 ..< 8 {
                     s.raindrops.append((
                         x: CGFloat.random(in: 0 ... max(width, 1)),
                         y: CGFloat.random(in: 0 ... max(height, 1))
                     ))
                 }
-            } else if emotion == .sob && s.raindrops.count < 40 {
-                // Heavy downpour for sob
-                for _ in 0 ..< 6 {
+            } else if emotion == .sob && s.raindrops.count < 80 {
+                // Torrential downpour for sob
+                for _ in 0 ..< 12 {
                     s.raindrops.append((
                         x: CGFloat.random(in: 0 ... max(width, 1)),
                         y: CGFloat.random(in: 0 ... max(height, 1))

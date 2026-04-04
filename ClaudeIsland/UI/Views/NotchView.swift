@@ -36,7 +36,8 @@ struct NotchView: View {
             $0.phase == .processing || $0.phase.isWaitingForApproval
         }) ?? sessionMonitor.instances.first
         guard let session = activeSession else { return .neutral }
-        return EmotionManager.shared.emotion(for: session.sessionId)
+        let emo = EmotionManager.shared.emotion(for: session.sessionId)
+        return emo
     }
 
     /// Whether any Claude session is currently processing or compacting
@@ -61,6 +62,41 @@ struct NotchView: View {
                 return now.timeIntervalSince(enteredAt) < displayDuration
             }
             return false
+        }
+    }
+
+    /// Top edge overlay color -- matches sky in both open and closed states when sessions active
+    private var notchTopEdgeColor: Color {
+        guard showClosedActivity else { return .black }
+        switch primaryEmotion {
+        case .happy: return Color(red: 0.95, green: 0.80, blue: 0.35)
+        case .sad: return Color(red: 0.15, green: 0.18, blue: 0.30)
+        case .sob: return Color(red: 0.06, green: 0.06, blue: 0.12)
+        case .curious: return Color(red: 0.40, green: 0.65, blue: 0.90)
+        case .excited: return Color(red: 1.00, green: 0.70, blue: 0.30)
+        case .confused: return Color(red: 0.45, green: 0.35, blue: 0.60)
+        case .neutral:
+            let hour = Calendar.current.component(.hour, from: Date())
+            let isNight = hour < 6 || hour >= 20
+            return isNight ? Color(red: 0.05, green: 0.05, blue: 0.15) : Color(red: 0.55, green: 0.78, blue: 0.95)
+        }
+    }
+
+    /// Background color for the notch area -- matches scene sky only when closed bar is showing
+    /// When opened, the chat panel must stay black so content is readable
+    private var notchBackgroundColor: Color {
+        guard viewModel.status != .opened, showClosedActivity else { return .black }
+        switch primaryEmotion {
+        case .happy: return Color(red: 0.95, green: 0.80, blue: 0.35)
+        case .sad: return Color(red: 0.15, green: 0.18, blue: 0.30)
+        case .sob: return Color(red: 0.06, green: 0.06, blue: 0.12)
+        case .curious: return Color(red: 0.40, green: 0.65, blue: 0.90)
+        case .excited: return Color(red: 1.00, green: 0.70, blue: 0.30)
+        case .confused: return Color(red: 0.45, green: 0.35, blue: 0.60)
+        case .neutral:
+            let hour = Calendar.current.component(.hour, from: Date())
+            let isNight = hour < 6 || hour >= 20
+            return isNight ? Color(red: 0.05, green: 0.05, blue: 0.15) : Color(red: 0.55, green: 0.78, blue: 0.95)
         }
     }
 
@@ -144,11 +180,11 @@ struct NotchView: View {
                             : cornerRadiusInsets.closed.bottom
                     )
                     .padding([.horizontal, .bottom], viewModel.status == .opened ? 12 : 0)
-                    .background(.black)
+                    .background(notchBackgroundColor)
                     .clipShape(currentNotchShape)
                     .overlay(alignment: .top) {
                         Rectangle()
-                            .fill(.black)
+                            .fill(notchTopEdgeColor)
                             .frame(height: 1)
                             .padding(.horizontal, topCornerRadius)
                     }
@@ -252,14 +288,17 @@ struct NotchView: View {
     @ViewBuilder
     private var headerRow: some View {
         if viewModel.status == .opened && showClosedActivity {
-            // Opened state: turtle scene persists as header backdrop
+            // Opened state: turtle scene extends into padding so grass fills bezier corners
+            // Extra 4pt overshoot ensures no sub-pixel black gaps at bezier edges
+            let openedPad = cornerRadiusInsets.opened.top + 12 + 4
             ZStack {
                 TurtleSceneView(
                     emotion: primaryEmotion,
                     isProcessing: isProcessing,
-                    width: notchSize.width,
+                    width: notchSize.width + openedPad * 2,
                     height: closedNotchSize.height
                 )
+                .padding(.horizontal, -openedPad)
                 .matchedGeometryEffect(id: "turtle", in: activityNamespace, isSource: true)
 
                 // Menu button overlay on top right
@@ -287,15 +326,16 @@ struct NotchView: View {
             }
             .frame(height: closedNotchSize.height)
         } else if showClosedActivity {
-            // Closed with activity: turtle scene spans full width (both sides of notch)
+            // Closed with activity: turtle scene extends into padding so grass fills bezier corners
+            let closedPad = cornerRadiusInsets.closed.bottom + 4
             ZStack {
-                // Grass island background spanning the entire expanded area
                 TurtleSceneView(
                     emotion: primaryEmotion,
                     isProcessing: isProcessing,
-                    width: closedExpandedWidth,
+                    width: closedExpandedWidth + closedPad * 2,
                     height: closedNotchSize.height
                 )
+                .padding(.horizontal, -closedPad)
                 .matchedGeometryEffect(id: "turtle", in: activityNamespace, isSource: true)
 
                 // Overlay: permission indicator (left) or checkmark (right)

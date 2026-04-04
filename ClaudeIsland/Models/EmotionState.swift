@@ -12,9 +12,9 @@ import os.log
 
 private let logger = Logger(subsystem: "com.claudeisland", category: "EmotionState")
 
-/// Emotions the crab can express
+/// Emotions the turtle can express
 enum CrabEmotion: String, CaseIterable, Sendable {
-    case neutral, happy, sad, sob
+    case neutral, happy, sad, sob, curious, excited, confused
 }
 
 /// Observable emotion state that accumulates sentiment over time
@@ -25,6 +25,9 @@ final class EmotionState {
     private(set) var scores: [CrabEmotion: Double] = [
         .happy: 0.0,
         .sad: 0.0,
+        .curious: 0.0,
+        .excited: 0.0,
+        .confused: 0.0,
     ]
 
     // MARK: - Thresholds
@@ -32,6 +35,9 @@ final class EmotionState {
     static let sadThreshold = 0.45
     static let happyThreshold = 0.6
     static let sobEscalationThreshold = 0.9
+    static let curiousThreshold = 0.5
+    static let excitedThreshold = 0.7
+    static let confusedThreshold = 0.5
     static let intensityDampen = 0.5
     static let decayRate = 0.92
     static let interEmotionDecay = 0.9
@@ -57,7 +63,7 @@ final class EmotionState {
         }
 
         updateCurrentEmotion()
-        logger.info("[Emotion] detected: \(rawEmotion) (\(String(format: "%.2f", intensity))) -> \(self.currentEmotion.rawValue)")
+        logger.info("[Emotion] detected: \(rawEmotion, privacy: .public) (\(String(format: "%.2f", intensity), privacy: .public)) -> \(self.currentEmotion.rawValue, privacy: .public) scores=\(self.scores.map { "\($0.key.rawValue):\(String(format: "%.3f", $0.value))" }.joined(separator: ","), privacy: .public)")
     }
 
     /// Decay all scores (called on timer)
@@ -76,7 +82,7 @@ final class EmotionState {
 
     /// Reset to neutral
     func reset() {
-        scores = [.happy: 0.0, .sad: 0.0]
+        scores = [.happy: 0.0, .sad: 0.0, .curious: 0.0, .excited: 0.0, .confused: 0.0]
         currentEmotion = .neutral
     }
 
@@ -84,7 +90,14 @@ final class EmotionState {
         let best = scores.max(by: { $0.value < $1.value })
 
         if let best {
-            let threshold = best.key == .sad ? Self.sadThreshold : Self.happyThreshold
+            let threshold: Double
+            switch best.key {
+            case .sad: threshold = Self.sadThreshold
+            case .curious: threshold = Self.curiousThreshold
+            case .excited: threshold = Self.excitedThreshold
+            case .confused: threshold = Self.confusedThreshold
+            default: threshold = Self.happyThreshold
+            }
             if best.value >= threshold {
                 if best.key == .sad && best.value >= Self.sobEscalationThreshold {
                     currentEmotion = .sob
