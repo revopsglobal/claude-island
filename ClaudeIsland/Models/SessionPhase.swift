@@ -15,6 +15,14 @@ struct PermissionContext: Sendable {
     let toolInput: [String: AnyCodable]?
     let receivedAt: Date
 
+    /// Extract the question text from AskUserQuestion tool input
+    var questionText: String? {
+        guard toolName == "AskUserQuestion",
+              let input = toolInput,
+              let question = input["question"]?.value as? String else { return nil }
+        return question
+    }
+
     /// Format tool input for display
     var formattedInput: String? {
         guard let input = toolInput else { return nil }

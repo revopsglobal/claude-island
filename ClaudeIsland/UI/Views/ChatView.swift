@@ -419,10 +419,14 @@ struct ChatView: View {
 
     // MARK: - Interactive Prompt Bar
 
-    /// Bar for interactive tools like AskUserQuestion that need terminal input
+    /// Bar for interactive tools like AskUserQuestion -- answer directly from the app
     private var interactivePromptBar: some View {
         ChatInteractivePromptBar(
-            isInTmux: session.isInTmux,
+            question: session.activePermission?.questionText,
+            canSend: canSendMessages,
+            onSend: { answer in
+                Task { await sendToSession(answer) }
+            },
             onGoToTerminal: { focusTerminal() }
         )
     }
@@ -981,54 +985,69 @@ struct InterruptedMessageView: View {
 
 // MARK: - Chat Interactive Prompt Bar
 
-/// Bar for interactive tools like AskUserQuestion that need terminal input
+/// Bar for interactive tools like AskUserQuestion -- inline answer field
 struct ChatInteractivePromptBar: View {
-    let isInTmux: Bool
+    let question: String?
+    let canSend: Bool
+    let onSend: (String) -> Void
     let onGoToTerminal: () -> Void
 
+    @State private var answerText: String = ""
     @State private var showContent = false
-    @State private var showButton = false
+    @FocusState private var isInputFocused: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Tool info - same style as approval bar
-            VStack(alignment: .leading, spacing: 2) {
-                Text(MCPToolFormatter.formatToolName("AskUserQuestion"))
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+        VStack(alignment: .leading, spacing: 8) {
+            // Question from Claude
+            if let question = question {
+                Text(question)
+                    .font(.system(size: 12))
                     .foregroundColor(TerminalColors.amber)
-                Text("Claude Code needs your input")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.5))
-                    .lineLimit(1)
+                    .lineLimit(3)
+                    .opacity(showContent ? 1 : 0)
+                    .offset(y: showContent ? 0 : 5)
+            } else {
+                Text("Claude is asking a question")
+                    .font(.system(size: 12))
+                    .foregroundColor(TerminalColors.amber)
+                    .opacity(showContent ? 1 : 0)
+            }
+
+            // Answer input
+            HStack(spacing: 8) {
+                TextField("Type your answer...", text: $answerText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .foregroundColor(canSend ? .white : .white.opacity(0.4))
+                    .focused($isInputFocused)
+                    .disabled(!canSend)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.white.opacity(canSend ? 0.08 : 0.04))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .strokeBorder(TerminalColors.amber.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                    .onSubmit {
+                        submitAnswer()
+                    }
+
+                Button {
+                    submitAnswer()
+                } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundColor(!canSend || answerText.isEmpty ? .white.opacity(0.2) : TerminalColors.amber.opacity(0.9))
+                }
+                .buttonStyle(.plain)
+                .contentShape(Circle())
+                .disabled(!canSend || answerText.isEmpty)
             }
             .opacity(showContent ? 1 : 0)
-            .offset(x: showContent ? 0 : -10)
-
-            Spacer()
-
-            // Terminal button on right (similar to Allow button)
-            Button {
-                if isInTmux {
-                    onGoToTerminal()
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "terminal")
-                        .font(.system(size: 11, weight: .medium))
-                    Text("Terminal")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .foregroundColor(isInTmux ? .black : .white.opacity(0.4))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(isInTmux ? Color.white.opacity(0.95) : Color.white.opacity(0.1))
-                .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .opacity(showButton ? 1 : 0)
-            .scaleEffect(showButton ? 1 : 0.8)
         }
-        .frame(minHeight: 44)  // Consistent height with other bars
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color.black.opacity(0.2))
@@ -1036,10 +1055,18 @@ struct ChatInteractivePromptBar: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7).delay(0.05)) {
                 showContent = true
             }
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.7).delay(0.1)) {
-                showButton = true
+            // Auto-focus the input
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                isInputFocused = true
             }
         }
+    }
+
+    private func submitAnswer() {
+        let text = answerText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, canSend else { return }
+        answerText = ""
+        onSend(text)
     }
 }
 
