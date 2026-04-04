@@ -83,7 +83,7 @@ struct ChatView: View {
                                 removal: .opacity
                             ))
                     }
-                } else {
+                } else if canSendMessages {
                     inputBar
                         .transition(.opacity)
                 }
