@@ -347,6 +347,8 @@ struct InlineApprovalButtons: View {
     @State private var showChatButton = false
     @State private var showDenyButton = false
     @State private var showAllowButton = false
+    @State private var isDenyHovered = false
+    @State private var isAllowHovered = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -362,13 +364,15 @@ struct InlineApprovalButtons: View {
             } label: {
                 Text("Deny")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.1))
+                    .foregroundColor(isDenyHovered ? .white.opacity(0.9) : .white.opacity(0.6))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(isDenyHovered ? Color.white.opacity(0.18) : Color.white.opacity(0.1))
                     .clipShape(Capsule())
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
+            .onHover { isDenyHovered = $0 }
             .opacity(showDenyButton ? 1 : 0)
             .scaleEffect(showDenyButton ? 1 : 0.8)
 
@@ -378,12 +382,14 @@ struct InlineApprovalButtons: View {
                 Text("Allow")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.black)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.9))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(isAllowHovered ? Color.white : Color.white.opacity(0.9))
                     .clipShape(Capsule())
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
+            .onHover { isAllowHovered = $0 }
             .opacity(showAllowButton ? 1 : 0)
             .scaleEffect(showAllowButton ? 1 : 0.8)
         }
