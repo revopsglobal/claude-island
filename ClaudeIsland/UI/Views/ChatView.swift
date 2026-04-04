@@ -86,6 +86,13 @@ struct ChatView: View {
                 } else if canSendMessages {
                     inputBar
                         .transition(.opacity)
+                } else {
+                    Text("Continue in \(session.isInTmux ? "terminal" : "Claude Code Desktop")")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.3))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .transition(.opacity)
                 }
             }
         }
