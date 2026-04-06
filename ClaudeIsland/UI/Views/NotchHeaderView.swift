@@ -399,6 +399,22 @@ class TurtleSceneState: ObservableObject {
     @Published var flowerBloomScale: CGFloat = 1.0  // grows when happy
     @Published var teardrops: [(x: CGFloat, y: CGFloat, opacity: Double)] = []  // visible tears from Sheldon
 
+    // Spinach bowl (special treat, triggered by "feed Sheldon")
+    @Published var spinachVisible: Bool = false
+    @Published var spinachX: CGFloat = 0.20
+    @Published var spinachScale: CGFloat = 0
+    @Published var spinachLeafCount: Int = 4
+    @Published var isEatingSpinach: Bool = false
+    @Published var spinachEaten: Bool = false
+    @Published var hopOffset: CGFloat = 0  // vertical hop during excited reaction
+    @Published var feedRequested: Bool = false  // set by socket event, consumed by scene view
+
+    /// Called from ClaudeSessionMonitor when "feed Sheldon" is detected
+    func feedSheldon() {
+        guard !spinachVisible && !isEatingSpinach else { return }
+        feedRequested = true
+    }
+
     static let shared = TurtleSceneState()
 }
 
@@ -1133,6 +1149,76 @@ struct TurtleSceneView: View {
                 .animation(.easeInOut(duration: 0.8), value: s.flowerBloomScale)
             }
 
+            // Spinach bowl (special treat)
+            if s.spinachVisible {
+                Canvas { context, canvasSize in
+                    let sc = min(height * 0.35, 14) / 14.0
+                    let cx = canvasSize.width / 2
+                    let cy = canvasSize.height / 2
+
+                    // Bowl (rounded bottom, terracotta color)
+                    let bowlColor = Color(red: 0.72, green: 0.45, blue: 0.28)
+                    let bowlInner = Color(red: 0.82, green: 0.55, blue: 0.35)
+                    let bowlRim = Color(red: 0.65, green: 0.38, blue: 0.22)
+
+                    // Bowl body
+                    let bowl = Path { p in
+                        p.addEllipse(in: CGRect(x: cx - 7 * sc, y: cy + 2 * sc, width: 14 * sc, height: 8 * sc))
+                    }
+                    context.fill(bowl, with: .color(bowlColor))
+
+                    // Bowl rim (top edge)
+                    let rim = Path { p in
+                        p.addEllipse(in: CGRect(x: cx - 8 * sc, y: cy + 0 * sc, width: 16 * sc, height: 5 * sc))
+                    }
+                    context.fill(rim, with: .color(bowlRim))
+
+                    // Bowl inner
+                    let inner = Path { p in
+                        p.addEllipse(in: CGRect(x: cx - 6 * sc, y: cy + 0.5 * sc, width: 12 * sc, height: 4 * sc))
+                    }
+                    context.fill(inner, with: .color(bowlInner))
+
+                    // Spinach leaves poking out
+                    let leafDark = Color(red: 0.18, green: 0.52, blue: 0.15)
+                    let leafLight = Color(red: 0.25, green: 0.62, blue: 0.22)
+                    let currentLeafCount = self.s.spinachLeafCount
+
+                    // Leaf positions: angled outward from bowl center
+                    let leafSpecs: [(x: CGFloat, y: CGFloat, angle: Double, color: Color)] = [
+                        (-4, -3, -25, leafDark),
+                        (-1, -5, 5, leafLight),
+                        (2, -4, 20, leafDark),
+                        (5, -2, 35, leafLight),
+                    ]
+
+                    for (i, spec) in leafSpecs.enumerated() {
+                        guard i < currentLeafCount else { continue }
+                        let lx = cx + spec.x * sc
+                        let ly = cy + spec.y * sc
+                        context.drawLayer { ctx in
+                            let leafPath = Path { p in
+                                p.addEllipse(in: CGRect(x: lx - 2 * sc, y: ly - 3.5 * sc, width: 4 * sc, height: 7 * sc))
+                            }
+                            ctx.fill(leafPath, with: .color(spec.color))
+                            // Leaf vein (center line)
+                            let vein = Path { p in
+                                p.addRect(CGRect(x: lx - 0.3 * sc, y: ly - 3 * sc, width: 0.6 * sc, height: 5 * sc))
+                            }
+                            ctx.fill(vein, with: .color(leafDark.opacity(0.5)))
+                        }
+                    }
+                }
+                .frame(width: 28, height: 28)
+                .scaleEffect(s.spinachScale)
+                .offset(
+                    x: s.spinachX * width,
+                    y: -(height * 0.18)
+                )
+                .transition(.scale.combined(with: .opacity))
+                .animation(.easeInOut(duration: 0.2), value: s.spinachLeafCount)
+            }
+
             // Turtle (walks across scene, flips direction)
             ClaudeTurtleIcon(
                 size: min(height * 0.75, 28),
@@ -1151,7 +1237,7 @@ struct TurtleSceneView: View {
             .scaleEffect(x: s.facingRight ? s.breathScale : -s.breathScale, y: s.breathScale, anchor: .bottom)
             .offset(
                 x: s.walkX * width + (emotion == .sob ? CGFloat(s.trembleX) : 0) + s.tailWag,
-                y: -(height * 0.25) + CGFloat(sin(s.bobPhase) * Double(bobAmplitude))
+                y: -(height * 0.25) + CGFloat(sin(s.bobPhase) * Double(bobAmplitude)) - s.hopOffset
             )
             .rotationEffect(.degrees(s.swayAngle * swayDeg + s.spinAngle), anchor: .bottom)
             .onTapGesture {
@@ -1445,6 +1531,10 @@ struct TurtleSceneView: View {
                     if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && abs(s.walkX - s.flowerX) < 0.03 {
                         eatFlower()
                     }
+                    // Can still eat spinach on the way to rest
+                    if s.spinachVisible && !s.spinachEaten && !s.isEatingSpinach && s.spinachLeafCount > 0 && abs(s.walkX - s.spinachX) < 0.03 {
+                        eatSpinach()
+                    }
                     return
                 }
                 // Arrived at resting spot -- face toward center (away from nearest edge)
@@ -1495,6 +1585,11 @@ struct TurtleSceneView: View {
                 let eatGap: CGFloat = 0.04  // small gap so head reaches flower
                 if s.flowerVisible && !s.flowerEaten && !s.petalRegrowing && s.petalCount > 0 && abs(s.walkX - s.flowerX) < eatGap {
                     eatFlower()
+                }
+
+                // Check if turtle is near the spinach bowl
+                if s.spinachVisible && !s.spinachEaten && !s.isEatingSpinach && s.spinachLeafCount > 0 && abs(s.walkX - s.spinachX) < eatGap {
+                    eatSpinach()
                 }
             }
         }
@@ -1701,6 +1796,18 @@ struct TurtleSceneView: View {
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(Double.random(in: 1.0 ... 2.0)))
                     s.lookingUp = false
+                }
+            }
+
+            // Check for feed request (from "feed Sheldon" socket event)
+            if s.feedRequested {
+                s.feedRequested = false
+                if !s.spinachVisible && !s.isEatingSpinach {
+                    // Wake up if sleeping
+                    if s.isSleeping {
+                        withAnimation(.easeInOut(duration: 0.5)) { s.isSleeping = false }
+                    }
+                    spawnSpinach()
                 }
             }
 
@@ -1929,6 +2036,124 @@ struct TurtleSceneView: View {
             s.petalRegrowing = false
             s.flowerEaten = false
             // Don't redirect turtle -- he'll eat it next time he walks past
+        }
+    }
+
+    // MARK: - Spinach Logic (special treat)
+
+    private func spawnSpinach() {
+        guard !s.spinachVisible else { return }
+
+        // Place spinach on the left side so it's distinct from the flower
+        s.spinachX = CGFloat.random(in: -0.30 ... -0.20)
+        s.spinachEaten = false
+        s.spinachLeafCount = 4
+        s.spinachVisible = true
+        s.spinachScale = 0
+
+        // Grow animation
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+            s.spinachScale = 1.0
+        }
+
+        // Walk toward spinach (Sheldon gets excited when he spots it)
+        s.walkDirection = s.spinachX < s.walkX ? -1 : 1
+        s.facingRight = s.walkDirection > 0
+        s.isWalking = true
+    }
+
+    private func eatSpinach() {
+        guard !s.spinachEaten else { return }
+        s.spinachEaten = true
+        s.isEatingSpinach = true
+        s.isEating = true
+        s.isWalking = false
+
+        // Face toward the bowl
+        s.facingRight = s.spinachX > s.walkX
+
+        Task { @MainActor in
+            // Excited tail wag before eating
+            for _ in 0 ..< 4 {
+                withAnimation(.easeInOut(duration: 0.1)) { s.tailWag = 1.5 }
+                try? await Task.sleep(for: .milliseconds(120))
+                withAnimation(.easeInOut(duration: 0.1)) { s.tailWag = -1.5 }
+                try? await Task.sleep(for: .milliseconds(120))
+            }
+            withAnimation(.easeInOut(duration: 0.1)) { s.tailWag = 0 }
+
+            // Eat leaves one by one with mouth chomping
+            for leaf in stride(from: s.spinachLeafCount, to: 0, by: -1) {
+                s.mouthOpen = true
+                withAnimation(.spring(response: 0.1, dampingFraction: 0.5)) {
+                    s.headExtension = 3
+                }
+                try? await Task.sleep(for: .milliseconds(250))
+
+                s.mouthOpen = false
+                withAnimation(.easeOut(duration: 0.15)) {
+                    s.spinachLeafCount = leaf - 1
+                }
+                withAnimation(.easeOut(duration: 0.1)) {
+                    s.headExtension = 1
+                }
+                try? await Task.sleep(for: .milliseconds(200))
+
+                if leaf - 1 > 0 {
+                    s.mouthOpen = true
+                    try? await Task.sleep(for: .milliseconds(150))
+                    s.mouthOpen = false
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+            }
+
+            // Done eating -- excited reaction!
+            s.mouthOpen = false
+            withAnimation(.easeOut(duration: 0.2)) { s.headExtension = 0 }
+            s.isEating = false
+
+            // Happy hop (three little bounces)
+            for i in 0 ..< 3 {
+                let hopHeight: CGFloat = i == 0 ? 8 : (i == 1 ? 5 : 3)
+                withAnimation(.easeOut(duration: 0.12)) { s.hopOffset = hopHeight }
+                try? await Task.sleep(for: .milliseconds(120))
+                withAnimation(.easeIn(duration: 0.12)) { s.hopOffset = 0 }
+                try? await Task.sleep(for: .milliseconds(120))
+            }
+
+            // Rapid tail wag (happy after spinach)
+            for _ in 0 ..< 6 {
+                withAnimation(.easeInOut(duration: 0.08)) { s.tailWag = 2.0 }
+                try? await Task.sleep(for: .milliseconds(80))
+                withAnimation(.easeInOut(duration: 0.08)) { s.tailWag = -2.0 }
+                try? await Task.sleep(for: .milliseconds(80))
+            }
+            withAnimation(.easeInOut(duration: 0.1)) { s.tailWag = 0 }
+
+            // Spawn some sparkles (reuse existing sparkle system)
+            for _ in 0 ..< 5 {
+                s.sparkles.append((
+                    x: s.walkX + CGFloat.random(in: -0.05 ... 0.05),
+                    y: CGFloat.random(in: 0.1 ... 0.4),
+                    opacity: 1.0,
+                    size: CGFloat.random(in: 2 ... 4)
+                ))
+            }
+
+            // Clean up: hide the empty bowl after a moment
+            try? await Task.sleep(for: .seconds(1.0))
+            withAnimation(.easeOut(duration: 0.3)) {
+                s.spinachScale = 0
+            }
+            try? await Task.sleep(for: .milliseconds(350))
+            s.spinachVisible = false
+            s.isEatingSpinach = false
+
+            // Walk away happy
+            let awayDirection: CGFloat = s.walkX > 0 ? -1 : 1
+            s.walkDirection = awayDirection
+            s.facingRight = s.walkDirection > 0
+            s.isWalking = true
         }
     }
 }

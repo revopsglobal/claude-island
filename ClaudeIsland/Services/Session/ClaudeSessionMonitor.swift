@@ -60,6 +60,13 @@ class ClaudeSessionMonitor: ObservableObject {
                     }
                 }
 
+                // Feed Sheldon (triggered by "feed Sheldon" in Claude Code)
+                if event.event == "Notification" && event.notificationType == "feed_sheldon" {
+                    Task { @MainActor in
+                        TurtleSceneState.shared.feedSheldon()
+                    }
+                }
+
                 if event.event == "Stop" {
                     HookSocketServer.shared.cancelPendingPermissions(sessionId: event.sessionId)
                 }
