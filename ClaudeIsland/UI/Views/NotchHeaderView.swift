@@ -469,15 +469,31 @@ struct TurtleSceneView: View {
         }
     }
 
-    // Day/night cycle based on actual time
+    // Day/night cycle based on actual sunrise/sunset for Ridgefield, WA (98642, ~45.8°N)
     private var daylight: CGFloat {
-        let hour = Calendar.current.component(.hour, from: Date())
-        // 0.0 = full night, 1.0 = full day
-        switch hour {
-        case 6 ..< 8: return CGFloat(hour - 6) / 2.0 * 0.7 + 0.3   // dawn
-        case 8 ..< 17: return 1.0                                     // day
-        case 17 ..< 19: return 1.0 - CGFloat(hour - 17) / 2.0 * 0.8 // dusk (17→19, 1.0→0.2)
-        default: return 0.2                                            // night (19:00+)
+        let cal = Calendar.current
+        let now = Date()
+        let h = CGFloat(cal.component(.hour, from: now))
+        let m = CGFloat(cal.component(.minute, from: now))
+        let hour = h + m / 60.0
+        let month = cal.component(.month, from: now)
+
+        // Monthly sunrise/sunset in local time (accounts for DST)
+        let sunrises: [CGFloat] = [0, 7.78, 7.22, 6.37, 6.52, 5.78, 5.27, 5.45, 5.95, 6.58, 7.20, 6.87, 7.72]
+        let sunsets:  [CGFloat] = [0, 4.53, 5.32, 7.07, 7.88, 8.40, 8.92, 8.83, 8.25, 7.33, 6.00, 4.70, 4.25]
+
+        let rise = sunrises[month]
+        let set  = sunsets[month]
+        let transition: CGFloat = 1.25 // 75-min dawn/dusk transition
+
+        if hour < rise - transition || hour > set + transition {
+            return 0.15 // deep night
+        } else if hour < rise {
+            return 0.15 + (hour - (rise - transition)) / transition * 0.85 // dawn
+        } else if hour <= set {
+            return 1.0 // full day
+        } else {
+            return max(0.15, 1.0 - (hour - set) / transition * 0.85) // dusk
         }
     }
 
