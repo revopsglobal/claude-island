@@ -2045,7 +2045,7 @@ struct TurtleSceneView: View {
         guard !s.spinachVisible else { return }
 
         // Place spinach at a fixed far-left position (flower is fixed at 0.35 on the right)
-        s.spinachX = -0.46
+        s.spinachX = -0.42
         s.spinachEaten = false
         s.spinachLeafCount = 4
         s.spinachVisible = true
