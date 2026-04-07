@@ -476,9 +476,8 @@ struct TurtleSceneView: View {
         switch hour {
         case 6 ..< 8: return CGFloat(hour - 6) / 2.0 * 0.7 + 0.3   // dawn
         case 8 ..< 17: return 1.0                                     // day
-        case 17 ..< 20: return 1.0 - CGFloat(hour - 17) / 3.0 * 0.6 // dusk
-        case 20 ..< 22: return 0.4 - CGFloat(hour - 20) / 2.0 * 0.2 // evening
-        default: return 0.2                                            // night
+        case 17 ..< 19: return 1.0 - CGFloat(hour - 17) / 2.0 * 0.8 // dusk (17→19, 1.0→0.2)
+        default: return 0.2                                            // night (19:00+)
         }
     }
 
