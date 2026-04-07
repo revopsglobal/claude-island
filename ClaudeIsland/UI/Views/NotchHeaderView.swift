@@ -2044,8 +2044,8 @@ struct TurtleSceneView: View {
     private func spawnSpinach() {
         guard !s.spinachVisible else { return }
 
-        // Place spinach at the far left of the bar (flower is at 0.35 on the right)
-        s.spinachX = CGFloat.random(in: -0.47 ... -0.43)
+        // Place spinach at a fixed far-left position (flower is fixed at 0.35 on the right)
+        s.spinachX = -0.46
         s.spinachEaten = false
         s.spinachLeafCount = 4
         s.spinachVisible = true
