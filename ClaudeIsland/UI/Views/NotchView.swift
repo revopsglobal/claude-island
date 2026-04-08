@@ -89,9 +89,7 @@ struct NotchView: View {
         case .excited: return Color(red: 1.00, green: 0.70, blue: 0.30)
         case .confused: return Color(red: 0.45, green: 0.35, blue: 0.60)
         case .neutral:
-            let hour = Calendar.current.component(.hour, from: Date())
-            let isNight = hour < 6 || hour >= 20
-            return isNight ? Color(red: 0.05, green: 0.05, blue: 0.15) : Color(red: 0.55, green: 0.78, blue: 0.95)
+            return TimeOfDay.isNight() ? Color(red: 0.05, green: 0.05, blue: 0.15) : Color(red: 0.55, green: 0.78, blue: 0.95)
         }
     }
 
@@ -107,9 +105,7 @@ struct NotchView: View {
         case .excited: return Color(red: 1.00, green: 0.70, blue: 0.30)
         case .confused: return Color(red: 0.45, green: 0.35, blue: 0.60)
         case .neutral:
-            let hour = Calendar.current.component(.hour, from: Date())
-            let isNight = hour < 6 || hour >= 20
-            return isNight ? Color(red: 0.05, green: 0.05, blue: 0.15) : Color(red: 0.55, green: 0.78, blue: 0.95)
+            return TimeOfDay.isNight() ? Color(red: 0.05, green: 0.05, blue: 0.15) : Color(red: 0.55, green: 0.78, blue: 0.95)
         }
     }
 
@@ -618,6 +614,7 @@ struct NotchView: View {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     debouncedApprovalVisible = true
                 }
+                autoOpenForInteractiveTool(pendingSessions)
             }
         } else if approvalDebounceTask == nil {
             // Schedule showing after remaining time
@@ -626,13 +623,29 @@ struct NotchView: View {
                 try? await Task.sleep(for: .seconds(remaining))
                 guard !Task.isCancelled else { return }
                 // Re-check that permission is still pending
-                if hasRawPendingPermission {
+                let stillPending = sessionMonitor.instances.filter { $0.phase.isWaitingForApproval }
+                if !stillPending.isEmpty {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         debouncedApprovalVisible = true
                     }
+                    autoOpenForInteractiveTool(stillPending)
                 }
                 approvalDebounceTask = nil
             }
+        }
+    }
+
+    /// Auto-open the notch and navigate to the chat view for interactive tools (e.g. AskUserQuestion).
+    /// Without this, the user only sees a small permission icon in the closed bar and has to manually
+    /// click to open the notch, then find the right session to see the interactive prompt.
+    private func autoOpenForInteractiveTool(_ pendingSessions: [SessionState]) {
+        guard viewModel.status == .closed else { return }
+        guard let interactiveSession = pendingSessions.first(where: { $0.pendingToolName == "AskUserQuestion" }) else { return }
+
+        viewModel.notchOpen(reason: .notification)
+        // Small delay to let the open animation start before navigating to chat
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            viewModel.showChat(for: interactiveSession)
         }
     }
 
