@@ -430,9 +430,25 @@ struct NotchView: View {
            viewModel.status == .closed &&
            !TerminalVisibilityDetector.isTerminalVisibleOnCurrentSpace() {
             viewModel.notchOpen(reason: .notification)
+            autoOpenForInteractiveTool(sessions)
         }
 
         previousPendingIds = currentIds
+    }
+
+    /// Auto-open the notch and navigate to the chat view for interactive tools
+    /// like AskUserQuestion. Without this, the user only sees a small permission
+    /// icon in the closed bar and has to manually click to open the notch, then
+    /// find the right session to see the interactive prompt with option chips.
+    private func autoOpenForInteractiveTool(_ pendingSessions: [SessionState]) {
+        guard viewModel.status == .closed else { return }
+        guard let interactiveSession = pendingSessions.first(where: { $0.pendingToolName == "AskUserQuestion" }) else { return }
+
+        viewModel.notchOpen(reason: .notification)
+        // Small delay to let the open animation start before navigating to chat
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            viewModel.showChat(for: interactiveSession)
+        }
     }
 
     private func handleWaitingForInputChange(_ instances: [SessionState]) {
