@@ -31,6 +31,11 @@ class ClaudeSessionMonitor: ObservableObject {
     // MARK: - Monitoring Lifecycle
 
     func startMonitoring() {
+        // Start periodic status rechecking
+        Task {
+            await SessionStore.shared.startPeriodicStatusCheck()
+        }
+
         HookSocketServer.shared.start(
             onEvent: { event in
                 Task {
@@ -87,6 +92,9 @@ class ClaudeSessionMonitor: ObservableObject {
 
     func stopMonitoring() {
         HookSocketServer.shared.stop()
+        Task {
+            await SessionStore.shared.stopPeriodicStatusCheck()
+        }
     }
 
     // MARK: - Permission Handling

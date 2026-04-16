@@ -249,40 +249,49 @@ if [ -d "$WEBSITE_PUBLIC" ] && [ -f "$RELEASE_DIR/appcast/appcast.xml" ]; then
         echo "Updated appcast.xml with GitHub download URL"
     fi
 
-    # Update src/config.ts with latest version and download URL
+    # Update src/config.ts with latest version and download URL (preserve other content)
     CONFIG_FILE="$WEBSITE_DIR/src/config.ts"
     if [ -n "$GITHUB_DOWNLOAD_URL" ]; then
-        cat > "$CONFIG_FILE" << EOF
+        if [ -f "$CONFIG_FILE" ]; then
+            # Update existing constants in-place
+            sed -i '' "s|export const LATEST_VERSION = .*|export const LATEST_VERSION = \"$VERSION\";|" "$CONFIG_FILE"
+            sed -i '' "s|export const DOWNLOAD_URL = .*|export const DOWNLOAD_URL = \"$GITHUB_DOWNLOAD_URL\";|" "$CONFIG_FILE"
+        else
+            # Create new config file
+            cat > "$CONFIG_FILE" << EOF
 // Auto-updated by create-release.sh
 export const LATEST_VERSION = "$VERSION";
 export const DOWNLOAD_URL = "$GITHUB_DOWNLOAD_URL";
 EOF
+        fi
         echo "Updated src/config.ts with version $VERSION"
     fi
 
-    # Commit and push website changes
-    cd "$WEBSITE_DIR"
-    if [ -d ".git" ]; then
-        git add public/appcast.xml src/config.ts
-        if ! git diff --cached --quiet; then
-            git commit -m "Update appcast for v$VERSION"
-            echo "Committed appcast update"
+    # Deploy via Cloudflare Pages (manual wrangler deploy — the old GitHub
+    # repo is disabled, so git push is no longer an option).
+    cd "$WEBSITE_DIR" || exit 1
 
-            read -p "Push website changes to deploy? (Y/n) " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-                git push
-                echo "Website deployed!"
-            else
-                echo "Changes committed but not pushed. Run 'git push' in $WEBSITE_DIR to deploy."
-            fi
+    WRANGLER_PROJECT="${CLAUDE_ISLAND_WRANGLER_PROJECT:-claudeisland-website}"
+
+    read -p "Deploy website to Cloudflare Pages ($WRANGLER_PROJECT)? (Y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        if ! command -v wrangler >/dev/null 2>&1; then
+            echo "ERROR: wrangler not found. Install with: npm install -g wrangler"
+            echo "Skipping website deploy. Appcast updated locally at $WEBSITE_PUBLIC/appcast.xml"
         else
-            echo "No changes to commit"
+            echo "Building site..."
+            npm run build
+
+            echo "Deploying to Cloudflare Pages ($WRANGLER_PROJECT)..."
+            wrangler pages deploy dist --project-name="$WRANGLER_PROJECT"
+            echo "Website deployed!"
         fi
     else
-        echo "Copied appcast.xml to $WEBSITE_PUBLIC/"
-        echo "Note: Website directory is not a git repo"
+        echo "Skipped Cloudflare deploy."
+        echo "To deploy manually: cd $WEBSITE_DIR && npm run build && wrangler pages deploy dist --project-name=$WRANGLER_PROJECT"
     fi
+
     cd "$PROJECT_DIR"
 else
     echo "Website directory not found or appcast not generated"
